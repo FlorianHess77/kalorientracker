@@ -50,30 +50,69 @@ try {
   writeFileSync(join(OUT, 'vocab.json'), JSON.stringify({ model: MODEL, dim, scale: 100, items: CLIP_VOCAB.map(([term, ref]) => ({ term, ref })) }));
   console.log(`✓ ${CLIP_VOCAB.length} Begriffe, ${dim} Dimensionen`);
 
-  // ── 3. Probe mit Testbildern ──
+  // ── 3. Varianten des Bild-Modells mit Testbildern vergleichen und die beste nehmen ──
   const processor = await T.AutoProcessor.from_pretrained(MODEL);
-  const visionModel = await T.CLIPVisionModelWithProjection.from_pretrained(MODEL, { dtype: 'q8' });
-  const tests = {
-    steak: 'https://commons.wikimedia.org/wiki/Special:FilePath/Venison_Steaks.jpg?width=512',
-    fries: 'https://commons.wikimedia.org/wiki/Special:FilePath/French_Fries.JPG?width=512',
-    pizza: 'https://commons.wikimedia.org/wiki/Special:FilePath/Pizza-3007395.jpg?width=512',
+  const C = 'https://commons.wikimedia.org/wiki/Special:FilePath/';
+  const tests = [
+    ['steak', `${C}Steak_03_bg_042906.jpg?width=640`, /steak|Rinder/i],
+    ['fries', `${C}Fries_2.jpg?width=640`, /Pommes/i],
+    ['fries2', `${C}French_Fries.JPG?width=640`, /Pommes/i],
+    ['pizza', `${C}Eq_it-na_pizza-margherita_sep2005_sml.jpg?width=640`, /pizza/i],
+    ['beans', `${C}Green_beans.jpg?width=640`, /Fisolen/i],
+    ['salad', `${C}Salad_platter.jpg?width=640`, /salat|salad/i],
+  ];
+  const images = [];
+  for (const [name, url, expect] of tests) {
+    try { images.push([name, await T.RawImage.read(url), expect]); } catch (e) { info.clipImageErrors = { ...(info.clipImageErrors ?? {}), [name]: e.message }; }
+  }
+  const cats = await T.RawImage.read('https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/cats.jpg').catch(() => null);
+  const animalEmbeds = [];
+  for (const t of ['a photo of cats', 'a photo of dogs', 'a photo of birds']) {
+    const { text_embeds } = await textModel(tokenizer([t], { padding: 'max_length', truncation: true }));
+    animalEmbeds.push(text_embeds.normalize().tolist()[0]);
+  }
+  const probs = (v, list) => {
+    const logits = list.map((e) => 100 * e.reduce((sum, x, i) => sum + x * v[i], 0));
+    const max = Math.max(...logits);
+    const exp = logits.map((l) => Math.exp(l - max));
+    const total = exp.reduce((a, b) => a + b, 0);
+    return exp.map((x) => x / total);
   };
-  info.clipTest = {};
-  for (const [name, url] of Object.entries(tests)) {
+  const FILES = { q8: 'vision_model_quantized.onnx', fp16: 'vision_model_fp16.onnx', fp32: 'vision_model.onnx' };
+  info.clipEval = {};
+  let bestDtype = 'q8';
+  let bestScore = -1;
+  for (const dtype of ['q8', 'fp16', 'fp32']) {
     try {
-      const image = await T.RawImage.read(url);
-      const { image_embeds } = await visionModel(await processor(image));
-      const v = image_embeds.normalize().tolist()[0];
-      const logits = embeds.map((e) => 100 * e.reduce((s, x, i) => s + x * v[i], 0));
-      const max = Math.max(...logits);
-      const exp = logits.map((l) => Math.exp(l - max));
-      const sum = exp.reduce((a, b) => a + b, 0);
-      info.clipTest[name] = exp.map((p, i) => [CLIP_VOCAB[i][0], Math.round((p / sum) * 100)])
-        .sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t, p]) => `${t} ${p}%`);
+      const visionModel = await T.CLIPVisionModelWithProjection.from_pretrained(MODEL, { dtype });
+      const embedOf = async (img) => (await visionModel(await processor(img))).image_embeds.normalize().tolist()[0];
+      const res = { };
+      let score = 0;
+      if (cats) res.cats = `${Math.round(probs(await embedOf(cats), animalEmbeds)[0] * 100)}% Katzen`;
+      for (const [name, img, expect] of images) {
+        const p = probs(await embedOf(img), embeds);
+        const top = p.map((x, i) => [i, x]).sort((a, b) => b[1] - a[1]).slice(0, 3);
+        if (expect.test(String(CLIP_VOCAB[top[0][0]][1]))) score++;
+        res[name] = top.map(([i, x]) => `${CLIP_VOCAB[i][0]} ${Math.round(x * 100)}%`);
+      }
+      res.score = score;
+      info.clipEval[dtype] = res;
+      if (score > bestScore) { bestScore = score; bestDtype = dtype; }
     } catch (e) {
-      info.clipTest[name] = `Fehler: ${e.message}`;
+      info.clipEval[dtype] = `Fehler: ${e.message}`;
     }
   }
+  // gewählte Variante für den Browser bereitstellen
+  if (bestDtype !== 'q8') {
+    const f = `onnx/${FILES[bestDtype]}`;
+    const res = await fetch(`https://huggingface.co/${MODEL}/resolve/main/${f}`);
+    if (!res.ok) throw new Error(`${f}: HTTP ${res.status}`);
+    writeFileSync(join(dir, f), Buffer.from(await res.arrayBuffer()));
+  }
+  const vocabFile = JSON.parse(readFileSync(join(OUT, 'vocab.json'), 'utf8'));
+  writeFileSync(join(OUT, 'vocab.json'), JSON.stringify({ ...vocabFile, dtype: bestDtype }));
+  info.clipDtype = bestDtype;
+  console.log('Vergleich:', JSON.stringify(info.clipEval));
   info.clip = { ok: true, terms: CLIP_VOCAB.length, dim };
   console.log('Probe:', JSON.stringify(info.clipTest));
 } catch (e) {

@@ -50,7 +50,7 @@ async function createEngine() {
     }
   }
   const processor = await T.AutoProcessor.from_pretrained(vocab.model);
-  const model = await T.CLIPVisionModelWithProjection.from_pretrained(vocab.model, { dtype: 'q8', device: 'wasm' });
+  const model = await T.CLIPVisionModelWithProjection.from_pretrained(vocab.model, { dtype: vocab.dtype ?? 'q8', device: 'wasm' });
   const embeds = new Float32Array(embBuf);
   if (embeds.length !== vocab.items.length * vocab.dim) throw new Error('Text-Fingerabdrücke passen nicht zum Wortschatz');
   status = 'ready';

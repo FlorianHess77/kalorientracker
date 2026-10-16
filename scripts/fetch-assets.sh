@@ -90,7 +90,7 @@ node -e '
   const fs = require("fs");
   const size = (p) => { try { return fs.statSync(p).size; } catch { return 0; } };
   const files = ["models/aiy_food_V1.tflite", "models/aiy_food_V1_labels.json", "models/clip/text-embeds.bin", "models/clip/vocab.json",
-    "models/clip/Xenova/mobileclip_s0/onnx/vision_model_quantized.onnx", "vendor/transformers/transformers.min.js", "vendor/tfjs/tf-core.min.js",
+    "models/clip/Xenova/mobileclip_s0/onnx/vision_model_quantized.onnx", "models/clip/Xenova/mobileclip_s0/onnx/vision_model_fp16.onnx", "models/clip/Xenova/mobileclip_s0/onnx/vision_model.onnx", "vendor/transformers/transformers.min.js", "vendor/tfjs/tf-core.min.js",
     "vendor/tfjs/tf-backend-cpu.min.js", "vendor/tfjs/tf-tflite.min.js", "vendor/zxing/zxing.min.js"];
   const wasm = fs.existsSync("vendor/tfjs") ? fs.readdirSync("vendor/tfjs").filter((f) => f.startsWith("tflite_web_api")) : [];
   const ort = fs.existsSync("vendor/ort") ? fs.readdirSync("vendor/ort") : [];
