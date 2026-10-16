@@ -54,7 +54,7 @@ try {
   const processor = await T.AutoProcessor.from_pretrained(MODEL);
   const C = 'https://commons.wikimedia.org/wiki/Special:FilePath/';
   const tests = [
-    ['steak', `${C}Steak_03_bg_042906.jpg?width=640`, /steak|Rinder/i],
+    ['steak', `${C}Venison_Steaks.jpg?width=640`, /steak|Rinder/i],
     ['fries', `${C}Fries_2.jpg?width=640`, /Pommes/i],
     ['fries2', `${C}French_Fries.JPG?width=640`, /Pommes/i],
     ['pizza', `${C}Eq_it-na_pizza-margherita_sep2005_sml.jpg?width=640`, /pizza/i],
@@ -80,8 +80,6 @@ try {
   };
   const FILES = { q8: 'vision_model_quantized.onnx', fp16: 'vision_model_fp16.onnx', fp32: 'vision_model.onnx' };
   info.clipEval = {};
-  let bestDtype = 'q8';
-  let bestScore = -1;
   for (const dtype of ['q8', 'fp16', 'fp32']) {
     try {
       const visionModel = await T.CLIPVisionModelWithProjection.from_pretrained(MODEL, { dtype });
@@ -97,24 +95,28 @@ try {
       }
       res.score = score;
       info.clipEval[dtype] = res;
-      if (score > bestScore) { bestScore = score; bestDtype = dtype; }
     } catch (e) {
       info.clipEval[dtype] = `Fehler: ${e.message}`;
     }
   }
-  // gewählte Variante für den Browser bereitstellen
-  if (bestDtype !== 'q8') {
-    const f = `onnx/${FILES[bestDtype]}`;
+  // Varianten für den Browser bereitstellen: die genaueste kleine zuerst, fp32 als Rückfallebene
+  // (manche Browser können fp16-Modelle nicht ausführen)
+  const order = ['fp16', 'fp32', 'q8'].filter((d) => typeof info.clipEval[d] === 'object')
+    .sort((a, b) => info.clipEval[b].score - info.clipEval[a].score);
+  const dtypes = order.filter((d) => info.clipEval[d].score === info.clipEval[order[0]].score);
+  if (!dtypes.includes('fp32') && typeof info.clipEval.fp32 === 'object') dtypes.push('fp32');
+  for (const d of dtypes) {
+    if (d === 'q8') continue; // liegt schon bereit
+    const f = `onnx/${FILES[d]}`;
     const res = await fetch(`https://huggingface.co/${MODEL}/resolve/main/${f}`);
     if (!res.ok) throw new Error(`${f}: HTTP ${res.status}`);
     writeFileSync(join(dir, f), Buffer.from(await res.arrayBuffer()));
   }
   const vocabFile = JSON.parse(readFileSync(join(OUT, 'vocab.json'), 'utf8'));
-  writeFileSync(join(OUT, 'vocab.json'), JSON.stringify({ ...vocabFile, dtype: bestDtype }));
-  info.clipDtype = bestDtype;
+  writeFileSync(join(OUT, 'vocab.json'), JSON.stringify({ ...vocabFile, dtype: dtypes[0], dtypes }));
+  info.clipDtype = dtypes;
   console.log('Vergleich:', JSON.stringify(info.clipEval));
   info.clip = { ok: true, terms: CLIP_VOCAB.length, dim };
-  console.log('Probe:', JSON.stringify(info.clipTest));
 } catch (e) {
   info.clip = { ok: false, error: String(e?.stack ?? e).slice(0, 600) };
   console.error('⚠ CLIP nicht vorbereitet:', e);

@@ -50,7 +50,24 @@ async function createEngine() {
     }
   }
   const processor = await T.AutoProcessor.from_pretrained(vocab.model);
-  const model = await T.CLIPVisionModelWithProjection.from_pretrained(vocab.model, { dtype: vocab.dtype ?? 'q8', device: 'wasm' });
+  // genaueste Variante zuerst; falls der Browser sie nicht ausführen kann, die nächste
+  let model = null;
+  let lastError = null;
+  for (const dtype of vocab.dtypes ?? [vocab.dtype ?? 'fp32']) {
+    try {
+      model = await T.CLIPVisionModelWithProjection.from_pretrained(vocab.model, { dtype, device: 'wasm' });
+      // Probelauf, damit Fehler bei der Ausführung hier auffallen und nicht erst beim Foto
+      const probe = new T.RawImage(new Uint8ClampedArray(64 * 64 * 4).fill(128), 64, 64, 4);
+      await model(await processor(probe));
+      clipDiag.dtype = dtype;
+      break;
+    } catch (e) {
+      lastError = e;
+      clipDiag.dtypeErrors = { ...(clipDiag.dtypeErrors ?? {}), [dtype]: String(e?.message ?? e).slice(0, 200) };
+      model = null;
+    }
+  }
+  if (!model) throw lastError ?? new Error('Kein CLIP-Modell ladbar');
   const embeds = new Float32Array(embBuf);
   if (embeds.length !== vocab.items.length * vocab.dim) throw new Error('Text-Fingerabdrücke passen nicht zum Wortschatz');
   status = 'ready';
