@@ -251,7 +251,8 @@ input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--accent); f
 .sticky-actions {
   position: sticky; bottom: calc(10px + var(--safe-b)); z-index: 10;
   display: flex; gap: 8px; padding: 10px; margin: 6px -6px 0;
-  background: color-mix(in srgb, var(--bg) 96%, transparent);
+  background: var(--bg);
+  box-shadow: 0 -6px 16px var(--bg);
   border-radius: 20px;
 }
 

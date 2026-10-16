@@ -5,7 +5,7 @@ import { app, navigate } from '../main.js';
 import { MEAL_TYPES, formatDayLabel, parseDecimal } from '../lib/dates.js';
 import { blobUrl } from '../lib/image.js';
 import { sumNutrients, withGrams } from '../lib/nutrition.js';
-import { clearDraft, getDraft, replaceItem } from '../draft.js';
+import { clearDraft, getDraft } from '../draft.js';
 import { draftItemFromCandidate } from './capture.js';
 import { button, clear, confirmDialog, fmt, h, header, iconButton, notice, promptDialog, segmented, toast } from '../ui.js';
 
@@ -38,26 +38,27 @@ export async function render(view) {
 
     if (d.preview) view.append(h('img', { class: 'review-photo', src: blobUrl(d.preview), alt: 'Dein Foto' }));
 
-    if (d.noFood) {
-      view.append(notice('Auf dem Foto wurde kein bekanntes Gericht erkannt. Das Modell kennt Gerichte (z. B. Schnitzel, Pizza), aber keine Einzelzutaten wie Obst – such diese bitte direkt.', 'info'));
+    if (d.noFood && !d.items.length) {
+      view.append(notice('Das Foto war nicht eindeutig. Tippe unten an, was auf dem Teller ist, oder such es direkt. Einzelzutaten wie Obst bitte über die Suche eintragen.', 'info'));
     }
 
     if (d.question?.length) {
+      const has = (label) => d.items.some((i) => i.label === label);
       view.append(
         h('section', { class: 'card question' },
-          h('h2', null, d.noFood ? 'Vielleicht eines davon?' : 'Was ist auf dem Foto?'),
+          h('h2', null, 'Was ist auf deinem Teller?'),
+          h('p', { class: 'muted small' }, 'Mehrere möglich – antippen zum Hinzufügen oder Entfernen.'),
           h('div', { class: 'chips wrap' },
-            d.question.map((c, idx) => h('button', {
-              type: 'button', class: ['chip', idx === 0 && !d.noFood && 'active'],
+            d.question.map((c) => h('button', {
+              type: 'button', class: ['chip', has(c.label) && 'active'], 'aria-pressed': has(c.label) ? 'true' : 'false',
               onclick: () => {
-                const item = draftItemFromCandidate(c);
-                if (d.items[0]) replaceItem(d.items[0].id, item); else d.items.push(item);
-                d.question = null;
+                if (has(c.label)) d.items = d.items.filter((i) => i.label !== c.label);
+                else d.items.push(draftItemFromCandidate(c));
                 d.noFood = false;
                 draw();
               },
-            }, `${c.name} · ${Math.round(c.confidence * 100)} %`)),
-            h('button', { type: 'button', class: 'chip', onclick: () => navigate(`search${d.items[0] ? `?replace=${d.items[0].id}` : ''}`) }, 'Etwas anderes …'))),
+            }, `${c.name} · ${Math.max(1, Math.round(c.confidence * 100))} %`)),
+            h('button', { type: 'button', class: 'chip', onclick: () => navigate('search') }, '+ Etwas anderes …'))),
       );
     }
 

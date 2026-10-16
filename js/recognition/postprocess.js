@@ -13,10 +13,13 @@
  */
 
 export const THRESHOLDS = Object.freeze({
-  minFood: 0.15, // darunter: "kein Essen erkannt"
-  confident: 0.5, // darunter: Rückfrage
+  // Das Modell wählt aus ca. 2000 Gerichten – schon 5 % sind deutlich über dem Zufall.
+  minFood: 0.03, // darunter: "kein Essen erkannt"
+  confident: 0.45, // darunter: Rückfrage
   minMargin: 0.15, // Platz 1 und 2 zu knapp beieinander: Rückfrage
-  topK: 5,
+  topK: 6,
+  component: 0.2, // so sicher muss ein Ausschnitt sein, damit er als eigene Komponente zählt
+  maxComponents: 4,
 });
 
 /** Hintergrundklasse und interne Knowledge-Graph-IDs ohne Klarnamen aussortieren */
@@ -51,6 +54,35 @@ export function topK(scores, labels, k) {
   return picked;
 }
 
+/**
+ * Mehrere Bildausschnitte (ganzes Foto + Teilbereiche) zusammenführen.
+ * - candidates: beste Gerichte über alle Ausschnitte (Mittel aus Höchst- und Durchschnittswert)
+ * - components: Gewinner einzelner Ausschnitte – so werden auf gemischten Tellern
+ *   z. B. Braten, Schupfnudeln und Krautsalat getrennt gefunden
+ */
+export function aggregateCrops(scoreSets, labels, k = THRESHOLDS.topK) {
+  if (!scoreSets.length) return { candidates: [], components: [] };
+  const n = Math.min(labels.length, ...scoreSets.map((x) => x.length));
+  const combined = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    let max = 0;
+    let sum = 0;
+    for (const x of scoreSets) { max = Math.max(max, x[i]); sum += x[i]; }
+    combined[i] = 0.5 * max + 0.5 * (sum / scoreSets.length);
+  }
+  const candidates = topK(combined, labels, k);
+  const winners = new Map();
+  for (const x of scoreSets) {
+    const [top] = topK(x, labels, 1);
+    if (top && top.confidence >= THRESHOLDS.component) winners.set(top.label, Math.max(winners.get(top.label) ?? 0, top.confidence));
+  }
+  const components = [...winners]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, THRESHOLDS.maxComponents)
+    .map(([label, confidence]) => ({ label, name: label, confidence }));
+  return { candidates, components };
+}
+
 export function decideStatus(candidates) {
   const [first, second] = candidates;
   if (!first || first.confidence < THRESHOLDS.minFood) return 'no_food';
@@ -60,21 +92,26 @@ export function decideStatus(candidates) {
 }
 
 /**
- * @param {{candidates:Array, classes:Map<string,{nameDe,per100g,portions}>, modelVersion:string, durationMs:number}} p
+ * @param {{candidates:Array, components?:Array, classes:Map<string,{nameDe,per100g,portions}>, modelVersion:string, durationMs:number}} p
  */
-export function buildOnDeviceResult({ candidates, classes, modelVersion, durationMs }) {
-  const named = candidates.map((c) => ({ ...c, name: classes.get(c.label)?.nameDe ?? c.label }));
-  const status = decideStatus(named);
+export function buildOnDeviceResult({ candidates, components = [], classes, modelVersion, durationMs }) {
+  const named = (list) => list.map((c) => ({ ...c, name: classes.get(c.label)?.nameDe ?? c.label }));
+  const cands = named(candidates);
+  let status = decideStatus(cands);
   if (status === 'no_food') {
-    return { provider: 'on-device', modelVersion, status, items: [], alternatives: named.slice(0, 3), durationMs };
+    return { provider: 'on-device', modelVersion, status, items: [], alternatives: cands.slice(0, 4), durationMs };
   }
-  const [best, ...rest] = named;
+  // Mehrere Komponenten gefunden → alle vorschlagen und zur Bestätigung nachfragen
+  const comps = named(components);
+  const picked = comps.length >= 2 ? comps : [cands[0]];
+  if (picked.length >= 2) status = 'uncertain';
+  const pickedLabels = new Set(picked.map((c) => c.label));
   return {
     provider: 'on-device',
     modelVersion,
     status,
-    items: [itemFromCandidate(best, classes)],
-    alternatives: rest,
+    items: picked.map((c) => itemFromCandidate(c, classes)),
+    alternatives: cands.filter((c) => !pickedLabels.has(c.label)),
     durationMs,
   };
 }

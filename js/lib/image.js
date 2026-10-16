@@ -19,7 +19,7 @@ export async function loadBitmap(file) {
   }
 }
 
-const dims = (src) => ({ w: src.naturalWidth || src.width, h: src.naturalHeight || src.height });
+export const dims = (src) => ({ w: src.naturalWidth || src.width, h: src.naturalHeight || src.height });
 
 /** Mittig quadratisch zuschneiden und auf w×h skalieren */
 export function squareCanvas(src, w, h) {
@@ -32,6 +32,33 @@ export function squareCanvas(src, w, h) {
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(src, (sw - side) / 2, (sh - side) / 2, side, side, 0, 0, w, h);
   return canvas;
+}
+
+/** Beliebigen quadratischen Ausschnitt (in Bildpixeln) auf w×h skalieren */
+export function regionCanvas(src, sx, sy, size, w, h) {
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(src, sx, sy, size, size, 0, 0, w, h);
+  return canvas;
+}
+
+/** Ausschnitte für die Erkennung: ganzes Foto, Mitte und vier überlappende Viertel */
+export function cropRegions(width, height) {
+  const s = Math.min(width, height);
+  const ox = (width - s) / 2;
+  const oy = (height - s) / 2;
+  const p = 0.6 * s;
+  return [
+    [ox, oy, s],
+    [ox + 0.2 * s, oy + 0.2 * s, p],
+    [ox, oy, p],
+    [ox + 0.4 * s, oy, p],
+    [ox, oy + 0.4 * s, p],
+    [ox + 0.4 * s, oy + 0.4 * s, p],
+  ];
 }
 
 /** Verkleinertes JPEG für die Foto-Vorschau im Tagebuch */

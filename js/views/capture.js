@@ -60,7 +60,8 @@ export async function render(view, params) {
         d.question = result.alternatives.length ? result.alternatives : null;
       } else {
         d.items = result.items.map((it) => toDraftItem(it));
-        if (result.status === 'uncertain') d.question = [result.items[0], ...result.alternatives.slice(0, 3)];
+        // Unsicher oder mehrere Komponenten: alle Vorschläge zum An- und Abwählen anbieten
+        if (result.status === 'uncertain') d.question = [...result.items, ...result.alternatives].slice(0, 7);
       }
       navigate('review');
     } catch (e) {

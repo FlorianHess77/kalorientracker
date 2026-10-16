@@ -4,7 +4,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { THRESHOLDS, buildOnDeviceResult, decideStatus, isUsableLabel, itemFromCandidate, toScores, topK, validateResult } from '../js/recognition/postprocess.js';
+import { THRESHOLDS, aggregateCrops, buildOnDeviceResult, decideStatus, isUsableLabel, itemFromCandidate, toScores, topK, validateResult } from '../js/recognition/postprocess.js';
 import { parseLabelCsv } from '../js/recognition/recognizer.js';
 import { FOOD_CLASSES } from '../js/data/food-classes.js';
 
@@ -56,9 +56,38 @@ describe('Erkennung: Auswertung', () => {
     const unknown = buildOnDeviceResult({ candidates: [{ label: 'Pizza bagel', name: 'Pizza bagel', confidence: 0.9 }], classes: FOOD_CLASSES, modelVersion: 't', durationMs: 1 });
     assert.equal(unknown.items[0].per100g, null);
     assert.deepEqual(validateResult(unknown), []);
-    const none = buildOnDeviceResult({ candidates: [{ label: 'Goulash', name: 'Goulash', confidence: 0.05 }], classes: FOOD_CLASSES, modelVersion: 't', durationMs: 1 });
+    const none = buildOnDeviceResult({ candidates: [{ label: 'Goulash', name: 'Goulash', confidence: 0.02 }], classes: FOOD_CLASSES, modelVersion: 't', durationMs: 1 });
     assert.equal(none.status, 'no_food');
     assert.deepEqual(validateResult(none), []);
+  });
+
+  test('Gemischter Teller: Ausschnitte ergeben mehrere Komponenten', () => {
+    const labels = ['__background__', 'Roast beef', 'Schupfnudel', 'Coleslaw', 'Sauerbraten'];
+    const sets = [
+      [0, 0.07, 0.05, 0.02, 0.04], // ganzes Foto: unsicher
+      [0, 0.45, 0.10, 0.01, 0.20], // Ausschnitt mit Fleisch
+      [0, 0.05, 0.62, 0.03, 0.02], // Ausschnitt mit Schupfnudeln
+      [0, 0.02, 0.04, 0.38, 0.01], // Ausschnitt mit Salat
+    ];
+    const { candidates, components } = aggregateCrops(sets, labels);
+    assert.deepEqual(components.map((c) => c.label), ['Schupfnudel', 'Roast beef', 'Coleslaw']);
+    assert.equal(candidates[0].label, 'Schupfnudel');
+    const r = buildOnDeviceResult({ candidates, components, classes: FOOD_CLASSES, modelVersion: 't', durationMs: 1 });
+    assert.equal(r.status, 'uncertain');
+    assert.deepEqual(r.items.map((i) => i.name), ['Schupfnudeln', 'Roastbeef', 'Krautsalat (cremig)']);
+    assert.ok(r.items.every((i) => i.per100g));
+    assert.ok(!r.alternatives.some((a) => ['Schupfnudel', 'Roast beef', 'Coleslaw'].includes(a.label)));
+    assert.deepEqual(validateResult(r), []);
+  });
+
+  test('Eindeutiges Gericht bleibt ein einzelner Eintrag', () => {
+    const labels = ['__background__', 'Schnitzel', 'Goulash'];
+    const sets = [[0, 0.9, 0.05], [0, 0.85, 0.1], [0, 0.8, 0.1]];
+    const { candidates, components } = aggregateCrops(sets, labels);
+    const r = buildOnDeviceResult({ candidates, components, classes: FOOD_CLASSES, modelVersion: 't', durationMs: 1 });
+    assert.equal(r.status, 'ok');
+    assert.equal(r.items.length, 1);
+    assert.equal(aggregateCrops([], labels).candidates.length, 0);
   });
 
   test('Rückfrage-Auswahl übernimmt Portionen', () => {

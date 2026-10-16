@@ -12,8 +12,8 @@
  */
 
 import { FOOD_CLASSES } from '../data/food-classes.js';
-import { loadBitmap, squareCanvas } from '../lib/image.js';
-import { THRESHOLDS, buildOnDeviceResult, toScores, topK, validateResult } from './postprocess.js';
+import { cropRegions, dims, loadBitmap, regionCanvas } from '../lib/image.js';
+import { aggregateCrops, buildOnDeviceResult, toScores, validateResult } from './postprocess.js';
 
 const ROOT = new URL('../../', import.meta.url);
 const local = (path) => new URL(path, ROOT).href;
@@ -167,40 +167,50 @@ export async function recognizeFood(file) {
   const tensors = [];
   try {
     const bitmap = await loadBitmap(file);
-    const canvas = squareCanvas(bitmap, width, height);
+    const { w: bw, h: bh } = dims(bitmap);
+    const isFloat = inputDtype === 'float32';
+    const scoreSets = [];
+    let outDtype = null;
+    let outLength = 0;
+
+    // Mehrere Ausschnitte auswerten, damit auch gemischte Teller erkannt werden
+    for (const [sx, sy, size] of cropRegions(bw, bh)) {
+      stage = 'Bild umwandeln';
+      const canvas = regionCanvas(bitmap, sx, sy, size, width, height);
+      const { data } = canvas.getContext('2d').getImageData(0, 0, width, height);
+      const values = isFloat ? new Float32Array(width * height * 3) : new Int32Array(width * height * 3);
+      for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
+        values[j] = isFloat ? data[i] / 255 : data[i];
+        values[j + 1] = isFloat ? data[i + 1] / 255 : data[i + 1];
+        values[j + 2] = isFloat ? data[i + 2] / 255 : data[i + 2];
+      }
+      const input = tf.tensor(values, [1, height, width, 3], isFloat ? 'float32' : 'int32');
+      tensors.push(input);
+
+      stage = 'Modell ausführen';
+      const output = model.predict(input);
+      const outTensor = pickTensor(output);
+      collectTensors(output, tensors);
+
+      stage = 'Ergebnis lesen';
+      const raw = await outTensor.data();
+      outDtype = outTensor.dtype;
+      outLength = raw.length;
+      scoreSets.push(normalizeScores(toScores(raw, outTensor.dtype), outTensor.dtype));
+    }
     bitmap.close?.();
 
-    // Pixel direkt aus dem Canvas lesen (robuster als tf.browser.fromPixels)
-    stage = 'Bild umwandeln';
-    const { data } = canvas.getContext('2d').getImageData(0, 0, width, height);
-    const isFloat = inputDtype === 'float32';
-    const values = isFloat ? new Float32Array(width * height * 3) : new Int32Array(width * height * 3);
-    for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
-      values[j] = isFloat ? data[i] / 255 : data[i];
-      values[j + 1] = isFloat ? data[i + 1] / 255 : data[i + 1];
-      values[j + 2] = isFloat ? data[i + 2] / 255 : data[i + 2];
-    }
-    const input = tf.tensor(values, [1, height, width, 3], isFloat ? 'float32' : 'int32');
-    tensors.push(input);
-
-    stage = 'Modell ausführen';
-    const output = model.predict(input);
-    const outTensor = pickTensor(output);
-    collectTensors(output, tensors);
-
-    stage = 'Ergebnis lesen';
-    const raw = await outTensor.data();
-    const scores = normalizeScores(toScores(raw, outTensor.dtype), outTensor.dtype);
-    const candidates = topK(scores, labels, THRESHOLDS.topK);
+    const { candidates, components } = aggregateCrops(scoreSets, labels);
     const result = buildOnDeviceResult({
       candidates,
+      components,
       classes: FOOD_CLASSES,
       modelVersion: MODEL_VERSION,
       durationMs: Math.round(performance.now() - started),
     });
     const errors = validateResult(result);
     if (errors.length) throw new Error(`Ungültiges Ergebnis: ${errors.join(', ')}`);
-    diag.lastRun = { at: new Date().toISOString(), outDtype: outTensor.dtype, outLength: raw.length, top: candidates.slice(0, 3), ms: result.durationMs };
+    diag.lastRun = { at: new Date().toISOString(), outDtype, outLength, crops: scoreSets.length, top: candidates.slice(0, 4), components, ms: result.durationMs };
     return result;
   } catch (e) {
     diag.lastError = String(e?.stack ?? e?.message ?? e).slice(0, 800);
