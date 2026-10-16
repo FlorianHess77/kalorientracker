@@ -48,18 +48,22 @@ fi
 
 # ── Bibliotheken (TensorFlow.js TFLite, ZXing für Barcodes auf iPhones) ──
 echo "Lade Bibliotheken …"
-if npm install --silent --no-audit --no-fund --prefix "$TMP/npm" \
-     @tensorflow/tfjs-core @tensorflow/tfjs-backend-cpu @tensorflow/tfjs-tflite @zxing/library@0.21.3 >/dev/null 2>&1; then
-  M="$TMP/npm/node_modules"
-  cp "$M/@tensorflow/tfjs-core/dist/tf-core.min.js" vendor/tfjs/
-  cp "$M/@tensorflow/tfjs-backend-cpu/dist/tf-backend-cpu.min.js" vendor/tfjs/
-  cp "$M/@tensorflow/tfjs-tflite/dist/tf-tflite.min.js" vendor/tfjs/
-  cp "$M"/@tensorflow/tfjs-tflite/dist/tflite_web_api* vendor/tfjs/
-  cp "$M/@zxing/library/umd/index.min.js" vendor/zxing/zxing.min.js
-  echo "  ✓ Bibliotheken abgelegt"
-else
-  echo "  ⚠ npm nicht verfügbar – die App lädt die Bibliotheken dann vom CDN."
-fi
+mkdir -p "$TMP/npm"
+echo '{"private":true}' > "$TMP/npm/package.json"
+for pkg in @tensorflow/tfjs-core @tensorflow/tfjs-backend-cpu @tensorflow/tfjs-tflite @zxing/library; do
+  if npm install --no-audit --no-fund --legacy-peer-deps --prefix "$TMP/npm" "$pkg" >"$TMP/npm-$(basename "$pkg").log" 2>&1; then
+    echo "  ✓ $pkg $(node -p "require('$TMP/npm/node_modules/$pkg/package.json').version")"
+  else
+    echo "  ⚠ $pkg nicht installiert:"; tail -n 5 "$TMP/npm-$(basename "$pkg").log"
+  fi
+done
+M="$TMP/npm/node_modules"
+cp "$M/@tensorflow/tfjs-core/dist/tf-core.min.js" vendor/tfjs/ 2>/dev/null || echo "  ⚠ tf-core fehlt"
+cp "$M/@tensorflow/tfjs-backend-cpu/dist/tf-backend-cpu.min.js" vendor/tfjs/ 2>/dev/null || echo "  ⚠ tf-backend-cpu fehlt"
+cp "$M/@tensorflow/tfjs-tflite/dist/tf-tflite.min.js" vendor/tfjs/ 2>/dev/null || echo "  ⚠ tf-tflite fehlt"
+cp "$M"/@tensorflow/tfjs-tflite/dist/tflite_web_api* vendor/tfjs/ 2>/dev/null || echo "  ⚠ WASM-Dateien fehlen"
+cp "$M/@zxing/library/umd/index.min.js" vendor/zxing/zxing.min.js 2>/dev/null || echo "  ⚠ zxing fehlt"
+ls "$M/@tensorflow/tfjs-tflite/dist" 2>/dev/null | head -40 > "$TMP/tflite-dist.txt" || true
 
 ls -la models vendor/tfjs vendor/zxing 2>/dev/null || true
 
@@ -70,7 +74,11 @@ node -e '
   const files = ["models/aiy_food_V1.tflite", "models/aiy_food_V1_labels.json", "vendor/tfjs/tf-core.min.js",
     "vendor/tfjs/tf-backend-cpu.min.js", "vendor/tfjs/tf-tflite.min.js", "vendor/zxing/zxing.min.js"];
   const wasm = fs.existsSync("vendor/tfjs") ? fs.readdirSync("vendor/tfjs").filter((f) => f.startsWith("tflite_web_api")) : [];
-  fs.writeFileSync("build-info.json", JSON.stringify({ builtAt: new Date().toISOString(), files: Object.fromEntries(files.map((f) => [f, size(f)])), wasm }, null, 2));
-'
+  const ver = (p) => { try { return require(process.argv[1] + "/" + p + "/package.json").version; } catch { return null; } };
+  const versions = Object.fromEntries(["@tensorflow/tfjs-core", "@tensorflow/tfjs-backend-cpu", "@tensorflow/tfjs-tflite", "@zxing/library"].map((p) => [p, ver(p)]));
+  let tfliteDist = [];
+  try { tfliteDist = fs.readFileSync(process.argv[2], "utf8").split("\n").filter(Boolean); } catch {}
+  fs.writeFileSync("build-info.json", JSON.stringify({ builtAt: new Date().toISOString(), files: Object.fromEntries(files.map((f) => [f, size(f)])), wasm, versions, tfliteDist }, null, 2));
+' "$TMP/npm/node_modules" "$TMP/tflite-dist.txt"
 cat build-info.json
 exit 0
