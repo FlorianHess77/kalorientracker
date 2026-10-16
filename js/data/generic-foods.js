@@ -42,6 +42,8 @@ const RAW = [
   ['Rote Rüben', 43, 1.6, 9.6, 0.2, 100, 'rote bete beetroot'],
   ['Sauerkraut', 19, 0.9, 4.3, 0.1, 150, 'sauerkraut'],
   ['Blattsalat', 15, 1.4, 2.9, 0.2, 60, 'salat lettuce'],
+  ['Gemüse, gemischt (gedünstet)', 50, 2.0, 7.0, 1.5, 150, 'gemüsebeilage vegetables'],
+  ['Bratensoße', 50, 1.5, 5.0, 2.5, 60, 'sauce soße gravy saft'],
   // Beilagen & Getreide
   ['Kartoffeln, gekocht', 87, 1.9, 20.1, 0.1, 200, 'erdäpfel potatoes'],
   ['Süßkartoffel, gekocht', 90, 2.0, 20.7, 0.2, 200, 'sweet potato'],
@@ -67,6 +69,8 @@ const RAW = [
   ['Putenbrust, gebraten', 150, 30.0, 0, 2.5, 150, 'pute turkey'],
   ['Rindersteak, gebraten', 220, 29.0, 0, 11.0, 200, 'steak beef'],
   ['Schweinefilet, gebraten', 160, 28.0, 0, 5.0, 150, 'pork'],
+  ['Schweinskotelett, gebraten', 230, 26.0, 0, 14.0, 180, 'kotelett pork chop karree'],
+  ['Hühnerkeule, gebraten', 220, 24.0, 0, 14.0, 200, 'hendlhaxe chicken leg'],
   ['Rinderfaschiertes, roh', 250, 17.2, 0, 20.0, 125, 'hackfleisch faschiertes mince'],
   ['Kochschinken', 110, 19.0, 1.0, 3.5, 30, 'schinken ham'],
   ['Salami', 400, 22.0, 1.0, 34.0, 20, 'salami'],

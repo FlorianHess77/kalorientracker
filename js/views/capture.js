@@ -3,15 +3,12 @@
 import * as db from '../db.js';
 import { app, navigate } from '../main.js';
 import { MEAL_TYPES, addDays, formatDayLabel, isValidISODate, mealLabel, mealTypeForTime, todayISO } from '../lib/dates.js';
-import { loadBitmap, makeThumbnail } from '../lib/image.js';
 import { nutrientsForGrams } from '../lib/nutrition.js';
 import { recentItems } from '../lib/stats.js';
-import { FOOD_CLASSES } from '../data/food-classes.js';
-import { RecognitionUnavailable, recognizeFood, recognizerStatus, warmUp } from '../recognition/recognizer.js';
-import { itemFromCandidate } from '../recognition/postprocess.js';
-import { compactVector, findMatches } from '../recognition/memory.js';
-import { clearDraft, getDraft, setCaptureContext, setPendingFood, startDraft } from '../draft.js';
-import { busy, confirmDialog, fmt, h, header, icon, pickFile, segmented, toast } from '../ui.js';
+import { recognizerStatus, warmUp } from '../recognition/recognizer.js';
+import { analyzePhoto } from '../photo-flow.js';
+import { clearDraft, getDraft, setCaptureContext, setPendingFood } from '../draft.js';
+import { confirmDialog, fmt, h, header, icon, pickFile, segmented, toast } from '../ui.js';
 
 export async function render(view, params) {
   const date = isValidISODate(params.date) ? params.date : app.viewDate ?? todayISO();
@@ -37,49 +34,9 @@ export async function render(view, params) {
   updateStatus();
   const timer = setInterval(updateStatus, 700);
 
-  async function handlePhoto(capture) {
-    const file = await pickFile({ accept: 'image/*', capture });
-    if (!file) return;
-    const b = busy(recognizerStatus() === 'ready' ? 'Foto wird analysiert …' : 'Foto-Erkennung wird geladen (beim ersten Mal ein paar MB) …');
-    try {
-      const bitmap = await loadBitmap(file);
-      const preview = await makeThumbnail(bitmap);
-      bitmap.close?.();
-      b.update('Foto wird analysiert …');
-      const result = await recognizeFood(file);
-
-      const d = startDraft({ ...ctx(), source: 'photo' });
-      d.preview = preview;
-      d.photo = app.prefs.storePhotos ? preview : null;
-      d.recognition = {
-        modelVersion: result.modelVersion,
-        status: result.status,
-        candidates: [...result.items, ...result.alternatives].map(({ label, name, confidence }) => ({ label, name, confidence: Math.round(confidence * 1000) / 1000 })),
-      };
-      // Foto-Gedächtnis: ähnliche, früher bestätigte Fotos als Vorschlag
-      if (result.vector) {
-        d.photoVector = compactVector(result.vector);
-        d.memoryMatches = findMatches(d.photoVector, await db.allPhotoMemory().catch(() => []));
-      }
-      if (result.status === 'no_food') {
-        d.noFood = true;
-        d.question = result.alternatives.length ? result.alternatives : null;
-      } else {
-        d.items = result.items.map((it) => toDraftItem(it));
-        // Unsicher oder mehrere Komponenten: alle Vorschläge zum An- und Abwählen anbieten
-        if (result.status === 'uncertain') d.question = [...result.items, ...result.alternatives].slice(0, 7);
-      }
-      navigate('review');
-    } catch (e) {
-      console.error(e);
-      if (e instanceof RecognitionUnavailable) {
-        toast(e.message, 'error');
-      } else {
-        toast(`Das Foto konnte nicht ausgewertet werden. Versuch es mit Suche oder Barcode. (Technisch: ${e.message})`, 'error');
-      }
-    } finally {
-      b.close();
-    }
+  async function fromGallery() {
+    const file = await pickFile({ accept: 'image/*' });
+    if (file) await analyzePhoto(file, ctx());
   }
 
   async function copyYesterday() {
@@ -117,9 +74,9 @@ export async function render(view, params) {
     header(`Erfassen · ${formatDayLabel(date)}`, { back: () => navigate(`today?date=${date}`) }),
     mealSwitch,
     h('div', { class: 'capture-main' },
-      h('button', { type: 'button', class: 'capture-big', onclick: () => handlePhoto('environment') },
+      h('button', { type: 'button', class: 'capture-big', onclick: () => navigate(`camera?date=${date}&meal=${mealType}`) },
         icon('camera', 40), h('strong', null, 'Foto aufnehmen'), h('span', null, 'Gericht fotografieren')),
-      h('button', { type: 'button', class: 'capture-secondary', onclick: () => handlePhoto(undefined) },
+      h('button', { type: 'button', class: 'capture-secondary', onclick: fromGallery },
         icon('image', 22), h('span', null, 'Aus Galerie wählen'))),
     statusLine,
     h('div', { class: 'tile-grid' },
@@ -142,18 +99,6 @@ export async function render(view, params) {
   }
 
   return () => clearInterval(timer);
-}
-
-function toDraftItem(it) {
-  const grams = it.estimatedGrams ?? it.portions?.medium_g ?? 100;
-  const base = { id: db.uid(), name: it.name, label: it.label, foodRef: it.label ? `model:${it.label}` : null, confidence: it.confidence, portions: it.portions, per100g: it.per100g, grams, estimated: Boolean(it.estimated), estimateType: it.estimateType ?? null };
-  if (!it.per100g) return { ...base, needsNutrition: true, kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
-  return { ...base, ...nutrientsForGrams(it.per100g, grams) };
-}
-
-/** Auswahl in der Rückfrage ("Ist das X oder Y?") → Eintrag */
-export function draftItemFromCandidate(candidate) {
-  return toDraftItem(itemFromCandidate(candidate, FOOD_CLASSES));
 }
 
 function tile(iconName, label, onClick) {

@@ -169,6 +169,16 @@ const RAW = {
   'Samosa':                  ['Samosa',                       260,  5.0, 30.0, 14.0,  50, 100, 150],
 
   // ───────── Fleisch, Beilagen, Salate, Suppen ─────────
+  'Delmonico steak':         ['Steak (Rib-Eye)',               250, 24.0,  0.0, 17.0, 150, 220, 300],
+  'London broil':            ['Rindersteak (mager)',           190, 28.0,  0.0,  8.0, 150, 220, 300],
+  'Steak Diane':             ['Steak mit Pfeffersauce',        230, 22.0,  3.0, 14.0, 180, 250, 320],
+  'Churrasco':               ['Gegrilltes Rindfleisch',        230, 26.0,  0.0, 14.0, 150, 250, 350],
+  'Carne asada':             ['Gegrilltes Rindersteak',        220, 26.0,  1.0, 12.0, 150, 250, 350],
+  'Surf and turf':           ['Steak mit Garnelen',            200, 25.0,  1.0, 11.0, 200, 300, 400],
+  'Chicken fried steak':     ['Paniertes Steak',               260, 16.0, 13.0, 16.0, 150, 220, 300],
+  'Swiss steak':             ['Geschmortes Steak',             160, 20.0,  5.0,  7.0, 180, 250, 320],
+  'Salisbury steak':         ['Fleischlaibchen mit Sauce',     200, 14.0,  8.0, 12.0, 150, 220, 300],
+  'Green bean casserole':    ['Grüne Bohnen (Auflauf)',         90,  2.0,  8.0,  6.0, 100, 150, 220],
   'Roast beef':              ['Roastbeef',                    190, 27.0,  0.0,  9.0, 100, 150, 220],
   'Beef Stroganoff':         ['Boeuf Stroganoff',             150, 11.0,  6.0,  9.0, 250, 350, 450],
   'Beef bourguignon':        ['Rindsragout in Rotwein',       140, 14.0,  4.0,  7.0, 250, 350, 450],

@@ -4,7 +4,7 @@
  * - Open Food Facts: immer live (keine Zwischenspeicherung hier)
  */
 
-const VERSION = '1.3.0';
+const VERSION = '1.4.0';
 const SHELL_CACHE = `kt-shell-${VERSION}`;
 const DATA_CACHE = 'kt-data-v1';
 
@@ -24,6 +24,7 @@ const SHELL_FILES = [
   'js/install.js',
   'js/ui.js',
   'js/off.js',
+  'js/photo-flow.js',
   'js/lib/calc.js',
   'js/lib/charts.js',
   'js/lib/dates.js',
@@ -38,6 +39,7 @@ const SHELL_FILES = [
   'js/recognition/postprocess.js',
   'js/recognition/recognizer.js',
   'js/views/barcode.js',
+  'js/views/camera.js',
   'js/views/capture.js',
   'js/views/food.js',
   'js/views/manual.js',

@@ -158,7 +158,7 @@ export function warmUp() {
  * @param {Blob|File} file Foto
  * @returns Ergebnis im gemeinsamen Format (siehe postprocess.js)
  */
-export async function recognizeFood(file) {
+export async function recognizeFood(source, { lowMemory = false } = {}) {
   const started = performance.now();
   const engine = await warmUp();
   const { tf, model, labels, inputDtype, width, height } = engine;
@@ -166,7 +166,8 @@ export async function recognizeFood(file) {
 
   const tensors = [];
   try {
-    const bitmap = await loadBitmap(file);
+    const ownBitmap = source instanceof Blob;
+    const bitmap = ownBitmap ? await loadBitmap(source) : source;
     const { w: bw, h: bh } = dims(bitmap);
     const isFloat = inputDtype === 'float32';
     const scoreSets = [];
@@ -174,7 +175,9 @@ export async function recognizeFood(file) {
     let outLength = 0;
 
     // Mehrere Ausschnitte auswerten, damit auch gemischte Teller erkannt werden
-    for (const [sx, sy, size, flip] of cropRegions(bw, bh)) {
+    // Sparmodus: nur ganzes Foto (normal + gespiegelt) und Mitte
+    const regions = lowMemory ? cropRegions(bw, bh).slice(0, 3) : cropRegions(bw, bh);
+    for (const [sx, sy, size, flip] of regions) {
       stage = 'Bild umwandeln';
       const canvas = regionCanvas(bitmap, sx, sy, size, width, height, flip);
       const { data } = canvas.getContext('2d').getImageData(0, 0, width, height);
@@ -198,7 +201,7 @@ export async function recognizeFood(file) {
       outLength = raw.length;
       scoreSets.push(normalizeScores(toScores(raw, outTensor.dtype), outTensor.dtype));
     }
-    bitmap.close?.();
+    if (ownBitmap) bitmap.close?.();
 
     const { candidates, components } = aggregateCrops(scoreSets, labels);
     // Gesamteindruck des Fotos (normal + gespiegelt) – für das Foto-Gedächtnis

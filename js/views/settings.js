@@ -181,7 +181,8 @@ export async function render(view) {
             const { getDiagnostics, warmUp } = await import('../recognition/recognizer.js');
             await warmUp().catch(() => {});
             const { lastSearchProblems } = await import('../off.js');
-            const text = JSON.stringify({ version: APP_VERSION, ...(await getDiagnostics()), searchProblems: lastSearchProblems }, null, 2);
+            const { photoState } = await import('../photo-flow.js');
+            const text = JSON.stringify({ version: APP_VERSION, lowMemory: Boolean(app.prefs.lowMemory), lastPhoto: photoState(), ...(await getDiagnostics()), searchProblems: lastSearchProblems }, null, 2);
             const pre = e.target.closest('details').querySelector('pre');
             pre.textContent = text;
             pre.hidden = false;

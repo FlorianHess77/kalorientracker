@@ -6,7 +6,7 @@ import { releaseBlobUrls } from './lib/image.js';
 import { clearDraft, setCaptureContext } from './draft.js';
 import { clear, h, icon, notice, toast } from './ui.js';
 
-export const APP_VERSION = '1.3.0';
+export const APP_VERSION = '1.4.0';
 
 export const app = {
   profile: null,
@@ -27,6 +27,7 @@ const ROUTES = {
   onboarding: () => import('./views/onboarding.js'),
   today: () => import('./views/today.js'),
   capture: () => import('./views/capture.js'),
+  camera: () => import('./views/camera.js'),
   review: () => import('./views/review.js'),
   search: () => import('./views/search.js'),
   food: () => import('./views/food.js'),
@@ -114,7 +115,7 @@ function tabBar(active) {
       type: 'button',
       class: 'tab-camera',
       'aria-label': 'Essen erfassen',
-      onclick: () => navigate(`capture?date=${app.viewDate}&meal=${mealTypeForTime()}`),
+      onclick: () => navigate(`camera?date=${app.viewDate}&meal=${mealTypeForTime()}`),
     }, icon('camera', 28)),
     h('button', {
       type: 'button',
@@ -149,17 +150,12 @@ async function boot() {
     app.installPrompt = e;
   });
   await render();
+  import('./photo-flow.js').then((m) => m.checkInterruptedPhoto()).catch(() => {});
 
   // In der Android-App liegen alle Dateien schon im Paket – dort kein Service Worker nötig
   if ('serviceWorker' in navigator && location.protocol !== 'file:' && !globalThis.Capacitor?.isNativePlatform?.()) {
-    // Neue Version sofort übernehmen: Wenn ein neuer Service Worker die Kontrolle übernimmt, einmal neu laden
-    const hadController = Boolean(navigator.serviceWorker.controller);
-    let reloading = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (!hadController || reloading) return;
-      reloading = true;
-      location.reload();
-    });
+    // Kein automatisches Neuladen bei Updates (würde z. B. eine laufende Foto-Auswertung abbrechen).
+    // Neue Dateien kommen trotzdem sofort: der Service Worker lädt immer zuerst aus dem Netz.
     navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
       .then((reg) => reg.update())
       .catch((e) => console.warn('Service Worker nicht registriert:', e));

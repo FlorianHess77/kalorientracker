@@ -207,6 +207,10 @@ describe('Auswertungen', () => {
     assert.equal(filterFoods(DISH_FOODS, 'cinnamon roll')[0].name, 'Zimtschnecke');
     assert.equal(filterFoods(DISH_FOODS, 'zimtschnecke')[0].name, 'Zimtschnecke');
     assert.equal(filterFoods(GENERIC_FOODS, 'paradeiser')[0].name, 'Tomate');
+    // Schnellwahl im Prüfen-Bildschirm verweist auf vorhandene Lebensmittel
+    for (const n of ['Rindersteak, gebraten', 'Pommes frites', 'Reis, gekocht', 'Kartoffeln, gekocht', 'Nudeln, gekocht', 'Fisolen, gekocht', 'Gemüse, gemischt (gedünstet)', 'Blattsalat', 'Bratensoße', 'Semmel']) {
+      assert.ok(GENERIC_FOODS.some((f) => f.name === n), n);
+    }
   });
 });
 

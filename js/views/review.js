@@ -5,13 +5,28 @@ import { app, navigate } from '../main.js';
 import { MEAL_TYPES, formatDayLabel, parseDecimal } from '../lib/dates.js';
 import { blobUrl } from '../lib/image.js';
 import { nutrientsForGrams, sumNutrients, withGrams } from '../lib/nutrition.js';
-import { clearDraft, getDraft } from '../draft.js';
+import { clearDraft, getDraft, itemFromFood } from '../draft.js';
 import { memoryItems } from '../recognition/memory.js';
 import { formatDayLabel as dayLabel } from '../lib/dates.js';
-import { draftItemFromCandidate } from './capture.js';
+import { draftItemFromCandidate } from '../photo-flow.js';
+import { GENERIC_FOODS } from '../data/generic-foods.js';
 import { button, clear, confirmDialog, fmt, h, header, iconButton, notice, promptDialog, segmented, toast } from '../ui.js';
 
 const MAX_GRAMS = 3000;
+
+/** [Anzeigename, Lebensmittel aus generic-foods.js] */
+const QUICK_SIDES = [
+  ['Steak', 'Rindersteak, gebraten'],
+  ['Pommes', 'Pommes frites'],
+  ['Reis', 'Reis, gekocht'],
+  ['Kartoffeln', 'Kartoffeln, gekocht'],
+  ['Nudeln', 'Nudeln, gekocht'],
+  ['Grüne Bohnen', 'Fisolen, gekocht'],
+  ['Gemüse', 'Gemüse, gemischt (gedünstet)'],
+  ['Salat', 'Blattsalat'],
+  ['Soße', 'Bratensoße'],
+  ['Brot', 'Semmel'],
+];
 
 export async function render(view) {
   const d = getDraft();
@@ -86,6 +101,28 @@ export async function render(view) {
               },
             }, `${c.name} · ${Math.max(1, Math.round(c.confidence * 100))} %`)),
             h('button', { type: 'button', class: 'chip', onclick: () => navigate('search') }, '+ Etwas anderes …'))),
+      );
+    }
+
+    // Schnellwahl für typische Beilagen, die die Foto-Erkennung oft nicht als eigenes Gericht kennt
+    if (d.source === 'photo') {
+      const has = (id) => d.items.some((i) => i.foodRef === id);
+      view.append(
+        h('section', { class: 'card quick-sides' },
+          h('h2', null, 'Fehlt etwas?'),
+          h('div', { class: 'chips wrap' },
+            QUICK_SIDES.map(([label, foodName]) => {
+              const food = GENERIC_FOODS.find((f) => f.name === foodName);
+              if (!food) return null;
+              return h('button', {
+                type: 'button', class: ['chip', has(food.id) && 'active'], 'aria-pressed': has(food.id) ? 'true' : 'false',
+                onclick: () => {
+                  if (has(food.id)) d.items = d.items.filter((i) => i.foodRef !== food.id);
+                  else d.items.push({ ...itemFromFood(food, food.servingG), name: label });
+                  draw();
+                },
+              }, `+ ${label}`);
+            }))),
       );
     }
 

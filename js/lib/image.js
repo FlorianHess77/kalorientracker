@@ -19,6 +19,17 @@ export async function loadBitmap(file) {
   }
 }
 
+/** Foto direkt verkleinert laden (spart Speicher bei 12-Megapixel-Fotos) */
+export async function loadBitmapScaled(file, maxSide = 1280) {
+  try {
+    const probe = await createImageBitmap(file, { imageOrientation: 'from-image', resizeWidth: maxSide, resizeQuality: 'high' });
+    // Hochformat: Breite begrenzt → Höhe evtl. größer; das ist in Ordnung (max. ~1700 px)
+    return probe;
+  } catch {
+    return loadBitmap(file);
+  }
+}
+
 export const dims = (src) => ({ w: src.naturalWidth || src.width, h: src.naturalHeight || src.height });
 
 /** Mittig quadratisch zuschneiden und auf w×h skalieren */
