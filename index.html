@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Kalorientracker</title>
+  <meta name="description" content="Kalorien und Makros per Foto, Barcode oder Suche erfassen – kostenlos, offline und ohne Konto.">
+  <meta name="theme-color" content="#f6f5f1" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#121412" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Kalorien">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="modulepreload" href="js/main.js">
+</head>
+<body>
+  <div id="app">
+    <div class="boot">
+      <div class="spinner"></div>
+      <p>Wird geladen …</p>
+    </div>
+  </div>
+  <noscript>
+    <p style="padding:24px;font-family:system-ui">Bitte JavaScript aktivieren, um den Kalorientracker zu nutzen.</p>
+  </noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

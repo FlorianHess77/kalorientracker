@@ -1,0 +1,6 @@
+# werden beim Veröffentlichen automatisch heruntergeladen (scripts/fetch-assets.sh)
+models/*.tflite
+models/*.json
+vendor/
+node_modules/
+.DS_Store

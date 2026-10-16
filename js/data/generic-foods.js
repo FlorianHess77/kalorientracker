@@ -1,0 +1,60 @@
+/**
+ * Grundnahrungsmittel, die das Foto-Modell nicht erkennt und die in Open Food Facts
+ * schwer zu finden sind. RICHTWERTE pro 100 g – vor einer Veröffentlichung prüfen.
+ *
+ * Format: [Name, kcal, Eiweiß g, Kohlenhydrate g, Fett g, übliche Portion g]
+ */
+const RAW = [
+  ['Apfel', 52, 0.3, 13.8, 0.2, 180],
+  ['Banane', 89, 1.1, 22.8, 0.3, 120],
+  ['Orange', 47, 0.9, 11.8, 0.1, 150],
+  ['Birne', 57, 0.4, 15.2, 0.1, 170],
+  ['Weintrauben', 69, 0.7, 18.1, 0.2, 125],
+  ['Erdbeeren', 32, 0.7, 7.7, 0.3, 150],
+  ['Heidelbeeren', 57, 0.7, 14.5, 0.3, 125],
+  ['Avocado', 160, 2.0, 8.5, 14.7, 70],
+  ['Tomate', 18, 0.9, 3.9, 0.2, 120],
+  ['Gurke', 15, 0.7, 3.6, 0.1, 100],
+  ['Karotte', 41, 0.9, 9.6, 0.2, 80],
+  ['Paprika rot', 31, 1.0, 6.0, 0.3, 150],
+  ['Brokkoli, gekocht', 35, 2.4, 7.2, 0.4, 150],
+  ['Blattsalat', 15, 1.4, 2.9, 0.2, 60],
+  ['Kartoffeln, gekocht', 87, 1.9, 20.1, 0.1, 200],
+  ['Reis, gekocht', 130, 2.7, 28.2, 0.3, 180],
+  ['Nudeln, gekocht', 158, 5.8, 30.9, 0.9, 200],
+  ['Haferflocken', 379, 13.2, 67.7, 6.5, 50],
+  ['Vollkornbrot', 247, 13.0, 41.0, 3.4, 50],
+  ['Semmel', 280, 9.0, 56.0, 1.5, 50],
+  ['Ei, gekocht', 155, 12.6, 1.1, 10.6, 60],
+  ['Hühnerbrust, gebraten', 165, 31.0, 0, 3.6, 150],
+  ['Rinderfaschiertes, roh', 250, 17.2, 0, 20.0, 125],
+  ['Lachs, gebraten', 206, 22.1, 0, 12.4, 125],
+  ['Thunfisch in Wasser', 116, 25.5, 0, 0.8, 80],
+  ['Milch 3,5 %', 64, 3.3, 4.8, 3.5, 250],
+  ['Naturjoghurt 3,5 %', 61, 3.5, 4.7, 3.3, 150],
+  ['Magertopfen', 67, 12.0, 4.0, 0.3, 125],
+  ['Gouda', 356, 24.9, 2.2, 27.4, 30],
+  ['Butter', 717, 0.9, 0.1, 81.1, 10],
+  ['Olivenöl', 884, 0, 0, 100, 10],
+  ['Erdnussbutter', 588, 25.1, 20.0, 50.4, 20],
+  ['Mandeln', 579, 21.2, 21.6, 49.9, 30],
+  ['Walnüsse', 654, 15.2, 13.7, 65.2, 30],
+  ['Honig', 304, 0.3, 82.4, 0, 20],
+  ['Zartbitterschokolade 70 %', 598, 7.8, 45.9, 42.6, 20],
+  ['Linsen, gekocht', 116, 9.0, 20.1, 0.4, 150],
+  ['Kichererbsen, gekocht', 164, 8.9, 27.4, 2.6, 150],
+  ['Tofu natur', 144, 15.6, 2.8, 8.7, 100],
+  ['Orangensaft', 45, 0.7, 10.4, 0.2, 250],
+  ['Cola', 42, 0, 10.6, 0, 330],
+  ['Bier', 43, 0.5, 3.6, 0, 500],
+];
+
+export const GENERIC_FOODS = RAW.map(([name, kcal, protein_g, carbs_g, fat_g, servingG]) => ({
+  id: `generic:${name}`,
+  source: 'generic',
+  name,
+  brand: null,
+  barcode: null,
+  per100g: { kcal, protein_g, carbs_g, fat_g },
+  servingG,
+}));
