@@ -27,11 +27,15 @@ const LABEL_SOURCES = [
   { url: local('models/aiy_food_V1_labels.json'), type: 'json' },
   { url: 'https://www.gstatic.com/aihub/tfhub/labelmaps/aiy_food_V1_labelmap.csv', type: 'csv' },
 ];
+// Fallback, falls die Dateien nicht mit veröffentlicht wurden (Versionen wie im Build geprüft)
 const CDN = 'https://cdn.jsdelivr.net/npm/@tensorflow';
+const TFJS_VERSION = '4.22.0';
+const TFLITE_VERSION = '0.0.1-alpha.10';
+const CDN_WASM = `${CDN}/tfjs-tflite@${TFLITE_VERSION}/wasm/`;
 const LIBS = [
-  [local('vendor/tfjs/tf-core.min.js'), `${CDN}/tfjs-core/dist/tf-core.min.js`],
-  [local('vendor/tfjs/tf-backend-cpu.min.js'), `${CDN}/tfjs-backend-cpu/dist/tf-backend-cpu.min.js`],
-  [local('vendor/tfjs/tf-tflite.min.js'), `${CDN}/tfjs-tflite/dist/tf-tflite.min.js`],
+  [local('vendor/tfjs/tf-core.min.js'), `${CDN}/tfjs-core@${TFJS_VERSION}/dist/tf-core.min.js`],
+  [local('vendor/tfjs/tf-backend-cpu.min.js'), `${CDN}/tfjs-backend-cpu@${TFJS_VERSION}/dist/tf-backend-cpu.min.js`],
+  [local('vendor/tfjs/tf-tflite.min.js'), `${CDN}/tfjs-tflite@${TFLITE_VERSION}/dist/tf-tflite.min.js`],
 ];
 
 export class RecognitionUnavailable extends Error {}
@@ -64,7 +68,10 @@ async function loadLibs() {
       await loadScript(cdnSrc);
     }
   }
-  return usedLocal ? local('vendor/tfjs/') : `${CDN}/tfjs-tflite/dist/`;
+  if (!usedLocal) return CDN_WASM;
+  // Lokale WebAssembly-Dateien nur verwenden, wenn sie wirklich mit veröffentlicht wurden
+  const ok = await fetch(local('vendor/tfjs/tflite_web_api_cc_simd.js'), { method: 'HEAD' }).then((r) => r.ok).catch(() => false);
+  return ok ? local('vendor/tfjs/') : CDN_WASM;
 }
 
 async function fetchFirst(sources, read) {

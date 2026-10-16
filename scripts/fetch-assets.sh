@@ -61,9 +61,12 @@ M="$TMP/npm/node_modules"
 cp "$M/@tensorflow/tfjs-core/dist/tf-core.min.js" vendor/tfjs/ 2>/dev/null || echo "  ⚠ tf-core fehlt"
 cp "$M/@tensorflow/tfjs-backend-cpu/dist/tf-backend-cpu.min.js" vendor/tfjs/ 2>/dev/null || echo "  ⚠ tf-backend-cpu fehlt"
 cp "$M/@tensorflow/tfjs-tflite/dist/tf-tflite.min.js" vendor/tfjs/ 2>/dev/null || echo "  ⚠ tf-tflite fehlt"
-cp "$M"/@tensorflow/tfjs-tflite/dist/tflite_web_api* vendor/tfjs/ 2>/dev/null || echo "  ⚠ WASM-Dateien fehlen"
+# Die WebAssembly-Laufzeit liegt im Ordner wasm/ des Pakets
+cp "$M"/@tensorflow/tfjs-tflite/wasm/tflite_web_api* vendor/tfjs/ 2>/dev/null \
+  || cp "$M"/@tensorflow/tfjs-tflite/dist/tflite_web_api_cc* vendor/tfjs/ 2>/dev/null \
+  || echo "  ⚠ WASM-Dateien fehlen"
 cp "$M/@zxing/library/umd/index.min.js" vendor/zxing/zxing.min.js 2>/dev/null || echo "  ⚠ zxing fehlt"
-ls "$M/@tensorflow/tfjs-tflite/dist" 2>/dev/null | head -40 > "$TMP/tflite-dist.txt" || true
+ls "$M/@tensorflow/tfjs-tflite/wasm" 2>/dev/null > "$TMP/tflite-dist.txt" || true
 
 ls -la models vendor/tfjs vendor/zxing 2>/dev/null || true
 

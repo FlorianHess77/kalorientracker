@@ -4,7 +4,7 @@
  * - Open Food Facts: immer live (keine Zwischenspeicherung hier)
  */
 
-const VERSION = '1.0.0';
+const VERSION = '1.0.1';
 const SHELL_CACHE = `kt-shell-${VERSION}`;
 const DATA_CACHE = 'kt-data-v1';
 
