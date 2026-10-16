@@ -434,3 +434,8 @@ details summary { cursor: pointer; color: var(--accent-strong); font-weight: 600
 }
 
 .diag-text { white-space: pre-wrap; word-break: break-all; font-size: .72rem; background: var(--bg); padding: 10px; border-radius: 10px; max-height: 320px; overflow: auto; user-select: text; }
+.memory-match {
+  width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; cursor: pointer;
+  padding: 12px; border-radius: var(--radius-sm); border: 1.5px solid var(--accent); background: var(--accent-soft); color: var(--text);
+}
+.memory-match .list-text strong { white-space: normal; }

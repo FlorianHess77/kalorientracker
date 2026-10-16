@@ -6,7 +6,7 @@ import { releaseBlobUrls } from './lib/image.js';
 import { clearDraft, setCaptureContext } from './draft.js';
 import { clear, h, icon, notice, toast } from './ui.js';
 
-export const APP_VERSION = '1.1.0';
+export const APP_VERSION = '1.2.0';
 
 export const app = {
   profile: null,
@@ -150,7 +150,8 @@ async function boot() {
   });
   await render();
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  // In der Android-App liegen alle Dateien schon im Paket – dort kein Service Worker nötig
+  if ('serviceWorker' in navigator && location.protocol !== 'file:' && !globalThis.Capacitor?.isNativePlatform?.()) {
     // Neue Version sofort übernehmen: Wenn ein neuer Service Worker die Kontrolle übernimmt, einmal neu laden
     const hadController = Boolean(navigator.serviceWorker.controller);
     let reloading = false;

@@ -10,12 +10,13 @@
  *  favorites { key, kind: 'food'|'recipe', food?, recipeId?, name, createdAt }
  *  weights   { date, kg }
  *  water     { date, ml }
+ *  photoMemory { id (= Mahlzeit), date, vector: { i, v }, items[], createdAt }
  */
 
 import { BACKUP_FORMAT, BACKUP_VERSION } from './lib/export.js';
 
 const DB_NAME = 'kalorientracker';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_DEFS = {
   settings: { keyPath: 'key' },
   goals: { keyPath: 'validFrom' },
@@ -25,6 +26,7 @@ const STORE_DEFS = {
   favorites: { keyPath: 'key' },
   weights: { keyPath: 'date' },
   water: { keyPath: 'date' },
+  photoMemory: { keyPath: 'id' }, // Fingerabdrücke bestätigter Fotos (keine Bilder)
 };
 export const STORE_NAMES = Object.keys(STORE_DEFS);
 
@@ -201,6 +203,19 @@ export async function addWater(date, deltaMl) {
   });
 }
 export const allWater = () => getAll('water');
+
+// ───────────── Foto-Gedächtnis ─────────────
+export const allPhotoMemory = () => getAll('photoMemory');
+export const getPhotoMemory = (id) => get('photoMemory', id);
+export const deletePhotoMemory = (id) => del('photoMemory', id);
+export async function savePhotoMemory(entry, maxEntries = 400) {
+  await put('photoMemory', entry);
+  const all = await getAll('photoMemory');
+  if (all.length > maxEntries) {
+    const old = all.sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(0, all.length - maxEntries);
+    for (const e of old) await del('photoMemory', e.id);
+  }
+}
 
 // ───────────── Backup, Export, Löschen ─────────────
 export async function exportAll() {

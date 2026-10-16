@@ -1,0 +1,8 @@
+{
+  "appId": "io.github.florianhess77.kalorientracker",
+  "appName": "Kalorientracker",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#121412"
+  }
+}

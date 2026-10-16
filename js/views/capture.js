@@ -9,6 +9,7 @@ import { recentItems } from '../lib/stats.js';
 import { FOOD_CLASSES } from '../data/food-classes.js';
 import { RecognitionUnavailable, recognizeFood, recognizerStatus, warmUp } from '../recognition/recognizer.js';
 import { itemFromCandidate } from '../recognition/postprocess.js';
+import { compactVector, findMatches } from '../recognition/memory.js';
 import { clearDraft, getDraft, setCaptureContext, setPendingFood, startDraft } from '../draft.js';
 import { busy, confirmDialog, fmt, h, header, icon, pickFile, segmented, toast } from '../ui.js';
 
@@ -55,6 +56,11 @@ export async function render(view, params) {
         status: result.status,
         candidates: [...result.items, ...result.alternatives].map(({ label, name, confidence }) => ({ label, name, confidence: Math.round(confidence * 1000) / 1000 })),
       };
+      // Foto-Gedächtnis: ähnliche, früher bestätigte Fotos als Vorschlag
+      if (result.vector) {
+        d.photoVector = compactVector(result.vector);
+        d.memoryMatches = findMatches(d.photoVector, await db.allPhotoMemory().catch(() => []));
+      }
       if (result.status === 'no_food') {
         d.noFood = true;
         d.question = result.alternatives.length ? result.alternatives : null;

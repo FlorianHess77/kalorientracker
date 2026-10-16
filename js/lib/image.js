@@ -35,29 +35,40 @@ export function squareCanvas(src, w, h) {
 }
 
 /** Beliebigen quadratischen Ausschnitt (in Bildpixeln) auf w×h skalieren */
-export function regionCanvas(src, sx, sy, size, w, h) {
+export function regionCanvas(src, sx, sy, size, w, h, flip = false) {
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   ctx.imageSmoothingQuality = 'high';
+  if (flip) {
+    ctx.translate(w, 0);
+    ctx.scale(-1, 1);
+  }
   ctx.drawImage(src, sx, sy, size, size, 0, 0, w, h);
   return canvas;
 }
 
-/** Ausschnitte für die Erkennung: ganzes Foto, Mitte und vier überlappende Viertel */
+/**
+ * Ausschnitte für die Erkennung: [x, y, Größe, gespiegelt]
+ * - ganzes Foto (normal und gespiegelt → stabilerer Gesamteindruck)
+ * - Mitte (60 % und 40 % für kleine Portionen in der Tellermitte)
+ * - vier überlappende Viertel (findet einzelne Komponenten auf gemischten Tellern)
+ */
 export function cropRegions(width, height) {
   const s = Math.min(width, height);
   const ox = (width - s) / 2;
   const oy = (height - s) / 2;
   const p = 0.6 * s;
   return [
-    [ox, oy, s],
-    [ox + 0.2 * s, oy + 0.2 * s, p],
-    [ox, oy, p],
-    [ox + 0.4 * s, oy, p],
-    [ox, oy + 0.4 * s, p],
-    [ox + 0.4 * s, oy + 0.4 * s, p],
+    [ox, oy, s, false],
+    [ox, oy, s, true],
+    [ox + 0.2 * s, oy + 0.2 * s, p, false],
+    [ox + 0.3 * s, oy + 0.3 * s, 0.4 * s, false],
+    [ox, oy, p, false],
+    [ox + 0.4 * s, oy, p, false],
+    [ox, oy + 0.4 * s, p, false],
+    [ox + 0.4 * s, oy + 0.4 * s, p, false],
   ];
 }
 

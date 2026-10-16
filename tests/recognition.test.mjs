@@ -145,3 +145,29 @@ describe('Erkennung: Rohwerte normalisieren', () => {
     assert.equal(normalizeScores(q, 'int32'), q);
   });
 });
+
+describe('Foto-Gedächtnis', () => {
+  test('Fingerabdruck, Ähnlichkeit und Vorschläge', async () => {
+    const { compactVector, similarity, findMatches, memoryItems } = await import('../js/recognition/memory.js');
+    const braten = compactVector(new Float32Array([0, 0.3, 0.25, 0.2, 0.05, 0.01]));
+    const bratenNochmal = compactVector(new Float32Array([0, 0.28, 0.3, 0.15, 0.04, 0.02]));
+    const pizza = compactVector(new Float32Array([0, 0.01, 0.0, 0.02, 0.9, 0.05]));
+    assert.ok(Math.abs(braten.v.reduce((a, b) => a + b, 0) - 1) < 1e-3);
+    assert.ok(Math.abs(similarity(braten, braten) - 1) < 1e-3);
+    assert.ok(similarity(braten, bratenNochmal) > 0.9);
+    assert.ok(similarity(braten, pizza) < 0.4);
+    assert.equal(similarity(null, braten), 0);
+
+    const item = (name, grams) => ({ name, grams, per100g: { kcal: 100, protein_g: 5, carbs_g: 10, fat_g: 3 } });
+    const entries = [
+      { id: 'a', date: '2026-10-12', vector: braten, items: [item('Roastbeef', 150), item('Schupfnudeln', 250)] },
+      { id: 'b', date: '2026-10-14', vector: braten, items: [item('Schupfnudeln', 200), item('Roastbeef', 150)] },
+      { id: 'c', date: '2026-10-13', vector: pizza, items: [item('Pizza', 300)] },
+    ];
+    const m = findMatches(bratenNochmal, entries);
+    assert.equal(m.length, 1, 'gleiche Zusammenstellung nur einmal');
+    assert.equal(m[0].id, 'b', 'neuester Eintrag zuerst');
+    assert.deepEqual(findMatches(pizza, entries.slice(0, 2)), []);
+    assert.deepEqual(memoryItems([item('A', 100), { name: 'ohne', grams: 10, per100g: null }]).map((i) => i.name), ['A']);
+  });
+});

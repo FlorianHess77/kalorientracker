@@ -250,7 +250,30 @@ export function busy(message) {
 }
 
 /** Datei an den Nutzer geben (Download bzw. Teilen-Dialog am Handy) */
+export const isNativeApp = () => Boolean(globalThis.Capacitor?.isNativePlatform?.());
+
+let nativePlugins = null;
+function plugins() {
+  nativePlugins ??= {
+    Filesystem: globalThis.Capacitor.registerPlugin('Filesystem'),
+    Share: globalThis.Capacitor.registerPlugin('Share'),
+  };
+  return nativePlugins;
+}
+
 export async function saveFile(content, filename, mime) {
+  if (isNativeApp()) {
+    // In der Android-App: Datei zwischenspeichern und über "Teilen" speichern/senden
+    const { Filesystem, Share } = plugins();
+    const text = content instanceof Blob ? await content.text() : content;
+    const { uri } = await Filesystem.writeFile({ path: filename, data: text, directory: 'CACHE', encoding: 'utf8' });
+    try {
+      await Share.share({ title: filename, url: uri, dialogTitle: 'Speichern oder teilen' });
+    } catch (e) {
+      if (!/cancel/i.test(e?.message ?? '')) throw e;
+    }
+    return;
+  }
   const blob = content instanceof Blob ? content : new Blob([content], { type: mime });
   const file = new File([blob], filename, { type: mime });
   if (navigator.canShare?.({ files: [file] })) {

@@ -4,8 +4,10 @@ import * as db from '../db.js';
 import { app, navigate } from '../main.js';
 import { MEAL_TYPES, formatDayLabel, parseDecimal } from '../lib/dates.js';
 import { blobUrl } from '../lib/image.js';
-import { sumNutrients, withGrams } from '../lib/nutrition.js';
+import { nutrientsForGrams, sumNutrients, withGrams } from '../lib/nutrition.js';
 import { clearDraft, getDraft } from '../draft.js';
+import { memoryItems } from '../recognition/memory.js';
+import { formatDayLabel as dayLabel } from '../lib/dates.js';
 import { draftItemFromCandidate } from './capture.js';
 import { button, clear, confirmDialog, fmt, h, header, iconButton, notice, promptDialog, segmented, toast } from '../ui.js';
 
@@ -40,6 +42,31 @@ export async function render(view) {
 
     if (d.noFood && !d.items.length) {
       view.append(notice('Das Foto war nicht eindeutig. Tippe unten an, was auf dem Teller ist, oder such es direkt. Einzelzutaten wie Obst bitte über die Suche eintragen.', 'info'));
+    }
+
+    if (d.memoryMatches?.length) {
+      view.append(
+        h('section', { class: 'card memory' },
+          h('h2', null, 'Schon mal gegessen?'),
+          h('p', { class: 'muted small' }, 'Dieses Foto ähnelt einem früheren Eintrag von dir. Antippen übernimmt die Einträge samt Mengen.'),
+          d.memoryMatches.map((m) => {
+            const kcal = m.items.reduce((sum, it) => sum + nutrientsForGrams(it.per100g, it.grams).kcal, 0);
+            return h('button', {
+              type: 'button', class: 'memory-match',
+              onclick: () => {
+                d.items = m.items.map((it) => ({ ...it, id: db.uid(), confidence: null, ...nutrientsForGrams(it.per100g, it.grams) }));
+                d.memoryMatches = null;
+                d.question = null;
+                d.noFood = false;
+                draw();
+              },
+            },
+            h('span', { class: 'list-text' },
+              h('strong', null, m.items.map((it) => it.name).join(', ')),
+              h('span', { class: 'muted small' }, `${dayLabel(m.date)} · ${Math.round(m.similarity * 100)} % ähnlich`)),
+            h('span', { class: 'list-kcal' }, `${fmt(kcal)} kcal`));
+          })),
+      );
     }
 
     if (d.question?.length) {
@@ -173,6 +200,7 @@ export async function render(view) {
     };
     try {
       await db.saveMeal(meal);
+      await rememberPhoto(meal).catch((e) => console.warn('Foto-Gedächtnis:', e));
       clearDraft();
       toast(editing ? 'Gespeichert' : 'Eingetragen', 'success');
       navigate(`today?date=${meal.date}`, { replace: true });
@@ -185,9 +213,22 @@ export async function render(view) {
     const ok = await confirmDialog({ title: 'Mahlzeit löschen?', text: 'Das kann nicht rückgängig gemacht werden.', confirmLabel: 'Löschen', danger: true });
     if (!ok) return;
     await db.deleteMeal(d.editingMealId);
+    await db.deletePhotoMemory(d.editingMealId).catch(() => {});
     clearDraft();
     toast('Gelöscht');
     navigate(`today?date=${d.date}`, { replace: true });
+  }
+
+  /** Bestätigte Foto-Einträge merken, damit ähnliche Fotos später erkannt werden */
+  async function rememberPhoto(meal) {
+    const items = memoryItems(meal.items);
+    if (!items.length) return;
+    if (d.photoVector) {
+      await db.savePhotoMemory({ id: meal.id, date: meal.date, vector: d.photoVector, items, createdAt: new Date().toISOString() });
+    } else if (editing) {
+      const existing = await db.getPhotoMemory(meal.id);
+      if (existing) await db.savePhotoMemory({ ...existing, items });
+    }
   }
 
   async function saveRecipe() {

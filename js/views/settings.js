@@ -5,7 +5,7 @@ import { APP_VERSION, app, goalForDate, navigate, refreshApp } from '../main.js'
 import { ACTIVITY_OPTIONS, GOAL_OPTIONS, MANUAL_ISSUE_TEXT, MIN_KCAL, checkManualGoals, kcalFromMacros } from '../lib/calc.js';
 import { parseDecimal, todayISO } from '../lib/dates.js';
 import { buildICS, mealsToCSV, validateBackup, waterToCSV, weightsToCSV } from '../lib/export.js';
-import { button, clear, confirmDialog, field, fmt, h, icon, notice, numberInput, pickFile, saveFile, toast } from '../ui.js';
+import { button, clear, confirmDialog, field, fmt, h, icon, isNativeApp, notice, numberInput, pickFile, saveFile, toast } from '../ui.js';
 
 export async function render(view) {
   const today = todayISO();
@@ -120,7 +120,9 @@ export async function render(view) {
   };
 
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  const standalone = window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone;
+  const native = isNativeApp();
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  const standalone = native || window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone;
 
   view.append(
     section('Ziele', 'scale', goalBox),
@@ -128,7 +130,12 @@ export async function render(view) {
       h('label', { class: 'toggle-row' },
         h('input', { type: 'checkbox', checked: app.prefs.storePhotos, onchange: togglePhotos }),
         h('span', null, 'Vorschaubilder der Essensfotos im Tagebuch speichern (nur auf diesem Gerät)')),
-      button('Gespeicherte Fotos löschen', removeStoredPhotos, { variant: 'ghost', small: true, iconName: 'trash' })),
+      button('Gespeicherte Fotos löschen', removeStoredPhotos, { variant: 'ghost', small: true, iconName: 'trash' }),
+      button('Foto-Gedächtnis zurücksetzen', async () => {
+        if (!(await confirmDialog({ title: 'Foto-Gedächtnis zurücksetzen?', text: 'Die App vergisst, welche Fotos zu welchen Einträgen gehörten. Deine Mahlzeiten bleiben erhalten.', confirmLabel: 'Zurücksetzen', danger: true }))) return;
+        for (const e of await db.allPhotoMemory()) await db.deletePhotoMemory(e.id);
+        toast('Foto-Gedächtnis zurückgesetzt');
+      }, { variant: 'ghost', small: true })),
     section('Erinnerungen', 'bell',
       h('p', { class: 'muted small' }, 'Web-Apps können ohne Server keine verlässlichen Push-Nachrichten schicken. Daher erstellt die App wiederkehrende Termine für deinen Handy-Kalender – der erinnert dich dann zuverlässig.'),
       h('div', { class: 'grid-3' }, timeInput('breakfast', 'Frühstück'), timeInput('lunch', 'Mittag'), timeInput('dinner', 'Abend')),
@@ -137,11 +144,15 @@ export async function render(view) {
       button('Zum Kalender hinzufügen', downloadReminders, { variant: 'secondary', iconName: 'download' })),
     !standalone
       ? section('Als App installieren', 'download',
-        app.installPrompt
-          ? button('Auf dem Startbildschirm installieren', async () => { app.installPrompt.prompt(); await app.installPrompt.userChoice; app.installPrompt = null; }, { iconName: 'download' })
-          : h('p', { class: 'muted small' }, isIOS
-            ? 'In Safari unten auf „Teilen“ tippen und „Zum Home-Bildschirm“ wählen. Dann startet die App wie eine normale App – und iOS löscht die Daten nicht nach längerer Nichtnutzung.'
-            : 'Im Browser-Menü „App installieren“ bzw. „Zum Startbildschirm hinzufügen“ wählen.'))
+        isAndroid
+          ? h('div', { class: 'stack' },
+            h('p', { class: 'muted small' }, 'Lade die Android-App herunter und öffne die Datei. Beim ersten Mal fragt Android, ob du Apps aus dieser Quelle erlauben willst. Deine bisherigen Einträge nimmst du per „Backup speichern“ und in der App „Backup einspielen“ mit.'),
+            h('a', { class: 'btn btn-primary', href: 'https://github.com/FlorianHess77/kalorientracker/releases/latest/download/kalorientracker.apk' }, icon('download', 20), h('span', null, 'Android-App herunterladen')))
+          : app.installPrompt
+            ? button('Auf dem Startbildschirm installieren', async () => { app.installPrompt.prompt(); await app.installPrompt.userChoice; app.installPrompt = null; }, { iconName: 'download' })
+            : h('p', { class: 'muted small' }, isIOS
+              ? 'In Safari unten auf „Teilen“ tippen und „Zum Home-Bildschirm“ wählen. Dann startet die App wie eine normale App – und iOS löscht die Daten nicht nach längerer Nichtnutzung.'
+              : 'Im Browser-Menü „App installieren“ bzw. „Zum Startbildschirm hinzufügen“ wählen.'))
       : null,
     section('Daten', 'download',
       !persisted ? notice('Der Browser darf die Daten bei Speichermangel löschen. Installiere die App auf dem Startbildschirm und mache ab und zu ein Backup.', 'info') : null,
@@ -157,6 +168,7 @@ export async function render(view) {
       h('ul', { class: 'info-list' },
         h('li', null, 'Alle Daten liegen nur in diesem Browser auf diesem Gerät. Es gibt keinen Server und kein Konto.'),
         h('li', null, 'Die Foto-Erkennung läuft lokal (Google AIY Food Classifier mit TensorFlow Lite). Fotos werden nicht hochgeladen.'),
+        h('li', null, 'Damit die App wiederkehrende Gerichte erkennt, merkt sie sich zu bestätigten Fotos einen Erkennungs-Fingerabdruck (eine Liste von Wahrscheinlichkeiten, kein Bild) und deine Einträge.'),
         h('li', null, 'Bei Barcode und Produktsuche wird nur der Barcode bzw. Suchbegriff an Open Food Facts gesendet. Produktdaten: © Open Food Facts, Lizenz ODbL.'),
         h('li', null, 'Kalorien- und Nährwertangaben sind Schätzungen. Die App ersetzt keine medizinische oder ernährungstherapeutische Beratung.')),
       h('p', { class: 'muted small center' }, `Version ${APP_VERSION}`),

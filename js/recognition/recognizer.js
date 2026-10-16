@@ -174,9 +174,9 @@ export async function recognizeFood(file) {
     let outLength = 0;
 
     // Mehrere Ausschnitte auswerten, damit auch gemischte Teller erkannt werden
-    for (const [sx, sy, size] of cropRegions(bw, bh)) {
+    for (const [sx, sy, size, flip] of cropRegions(bw, bh)) {
       stage = 'Bild umwandeln';
-      const canvas = regionCanvas(bitmap, sx, sy, size, width, height);
+      const canvas = regionCanvas(bitmap, sx, sy, size, width, height, flip);
       const { data } = canvas.getContext('2d').getImageData(0, 0, width, height);
       const values = isFloat ? new Float32Array(width * height * 3) : new Int32Array(width * height * 3);
       for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
@@ -201,6 +201,9 @@ export async function recognizeFood(file) {
     bitmap.close?.();
 
     const { candidates, components } = aggregateCrops(scoreSets, labels);
+    // Gesamteindruck des Fotos (normal + gespiegelt) – für das Foto-Gedächtnis
+    const vector = new Float32Array(scoreSets[0].length);
+    for (let i = 0; i < vector.length; i++) vector[i] = (scoreSets[0][i] + scoreSets[1][i]) / 2;
     const result = buildOnDeviceResult({
       candidates,
       components,
@@ -210,6 +213,7 @@ export async function recognizeFood(file) {
     });
     const errors = validateResult(result);
     if (errors.length) throw new Error(`Ungültiges Ergebnis: ${errors.join(', ')}`);
+    result.vector = vector;
     diag.lastRun = { at: new Date().toISOString(), outDtype, outLength, crops: scoreSets.length, top: candidates.slice(0, 4), components, ms: result.durationMs };
     return result;
   } catch (e) {
