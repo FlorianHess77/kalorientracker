@@ -15,6 +15,8 @@ import { FOOD_CLASSES } from './data/food-classes.js';
 import { RecognitionUnavailable, recognizeFood, recognizerStatus } from './recognition/recognizer.js';
 import { itemFromCandidate } from './recognition/postprocess.js';
 import { compactVector, findMatches } from './recognition/memory.js';
+import { classifyPhoto } from './recognition/clip.js';
+import { FOOD_BY_ID } from './data/food-index.js';
 import { startDraft } from './draft.js';
 import { busy, toast } from './ui.js';
 
@@ -57,6 +59,14 @@ export async function analyzePhoto(source, ctx) {
     b.update('Foto wird analysiert …');
     const result = await recognizeFood(bitmap, { lowMemory: Boolean(app.prefs.lowMemory) });
 
+    // Zweite Erkennung (MobileCLIP): findet einzelne Komponenten wie Steak, Pommes, Bohnen
+    setState('Komponenten');
+    b.update('Komponenten werden erkannt …');
+    const clip = await classifyPhoto(bitmap, { lowMemory: Boolean(app.prefs.lowMemory) }).catch((e) => {
+      console.warn('MobileCLIP nicht verfügbar:', e);
+      return null;
+    });
+
     setState('Vorschläge');
     const d = startDraft({ ...ctx, source: 'photo' });
     d.preview = preview;
@@ -71,7 +81,15 @@ export async function analyzePhoto(source, ctx) {
       d.photoVector = compactVector(result.vector);
       d.memoryMatches = findMatches(d.photoVector, await db.allPhotoMemory().catch(() => []));
     }
-    if (result.status === 'no_food') {
+    const clipComponents = (clip?.components ?? []).map(clipCandidate).filter(Boolean);
+    if (clipComponents.length && !(clip.nonFood >= 0.5 && result.status === 'no_food')) {
+      // Komponenten von CLIP vorauswählen, beide Erkennungen als Vorschläge anbieten
+      d.items = clipComponents.map((c) => toDraftItem(c));
+      const seen = new Set();
+      d.question = [...clipComponents, ...(clip.candidates.map(clipCandidate).filter(Boolean)), ...result.items, ...result.alternatives]
+        .filter((c) => { const k = c.name.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; })
+        .slice(0, 9);
+    } else if (result.status === 'no_food') {
       d.noFood = true;
       d.question = result.alternatives.length ? result.alternatives : null;
     } else {
@@ -95,10 +113,17 @@ export async function analyzePhoto(source, ctx) {
   }
 }
 
+/** CLIP-Treffer { ref, confidence } → Vorschlag im gleichen Format wie die Gerichte-Erkennung */
+export function clipCandidate({ ref, confidence }) {
+  const food = FOOD_BY_ID.get(ref);
+  if (!food) return null;
+  return { label: `clip:${ref}`, ref, name: food.name, confidence, estimatedGrams: null, per100g: food.per100g, portions: food.portions, servingG: food.servingG };
+}
+
 export function toDraftItem(it) {
-  const grams = it.estimatedGrams ?? it.portions?.medium_g ?? 100;
+  const grams = it.estimatedGrams ?? it.portions?.medium_g ?? it.servingG ?? 100;
   const base = {
-    id: db.uid(), name: it.name, label: it.label, foodRef: it.label ? `model:${it.label}` : null, confidence: it.confidence,
+    id: db.uid(), name: it.name, label: it.label, foodRef: it.ref ?? (it.label ? `model:${it.label}` : null), confidence: it.confidence, servingG: it.servingG ?? null,
     portions: it.portions, per100g: it.per100g, grams, estimated: Boolean(it.estimated), estimateType: it.estimateType ?? null,
   };
   if (!it.per100g) return { ...base, needsNutrition: true, kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
@@ -107,5 +132,6 @@ export function toDraftItem(it) {
 
 /** Auswahl in der Rückfrage ("Was ist auf deinem Teller?") → Eintrag */
 export function draftItemFromCandidate(candidate) {
+  if (candidate.ref) return toDraftItem(candidate);
   return toDraftItem(itemFromCandidate(candidate, FOOD_CLASSES));
 }

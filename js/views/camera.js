@@ -7,6 +7,7 @@ import { app, goBack, navigate } from '../main.js';
 import { MEAL_TYPES, isValidISODate, mealTypeForTime, todayISO } from '../lib/dates.js';
 import { analyzePhoto } from '../photo-flow.js';
 import { warmUp } from '../recognition/recognizer.js';
+import { warmUpClip } from '../recognition/clip.js';
 import { setCaptureContext } from '../draft.js';
 import { button, h, icon, iconButton, pickFile } from '../ui.js';
 
@@ -16,6 +17,7 @@ export async function render(view, params) {
   const ctx = { date, mealType };
   setCaptureContext(ctx);
   warmUp().catch(() => {});
+  warmUpClip().catch(() => {});
 
   let stream = null;
   let torchOn = false;

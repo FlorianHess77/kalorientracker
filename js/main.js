@@ -6,7 +6,7 @@ import { releaseBlobUrls } from './lib/image.js';
 import { clearDraft, setCaptureContext } from './draft.js';
 import { clear, h, icon, notice, toast } from './ui.js';
 
-export const APP_VERSION = '1.4.0';
+export const APP_VERSION = '1.5.0';
 
 export const app = {
   profile: null,

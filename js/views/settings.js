@@ -182,7 +182,8 @@ export async function render(view) {
             await warmUp().catch(() => {});
             const { lastSearchProblems } = await import('../off.js');
             const { photoState } = await import('../photo-flow.js');
-            const text = JSON.stringify({ version: APP_VERSION, lowMemory: Boolean(app.prefs.lowMemory), lastPhoto: photoState(), ...(await getDiagnostics()), searchProblems: lastSearchProblems }, null, 2);
+            const { clipDiag } = await import('../recognition/clip.js');
+            const text = JSON.stringify({ version: APP_VERSION, lowMemory: Boolean(app.prefs.lowMemory), lastPhoto: photoState(), clip: clipDiag, ...(await getDiagnostics()), searchProblems: lastSearchProblems }, null, 2);
             const pre = e.target.closest('details').querySelector('pre');
             pre.textContent = text;
             pre.hidden = false;

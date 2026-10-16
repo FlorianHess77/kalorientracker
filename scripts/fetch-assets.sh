@@ -68,21 +68,40 @@ cp "$M"/@tensorflow/tfjs-tflite/wasm/tflite_web_api* vendor/tfjs/ 2>/dev/null \
 cp "$M/@zxing/library/umd/index.min.js" vendor/zxing/zxing.min.js 2>/dev/null || echo "  ⚠ zxing fehlt"
 ls "$M/@tensorflow/tfjs-tflite/wasm" 2>/dev/null > "$TMP/tflite-dist.txt" || true
 
+# ── Zweite Foto-Erkennung: MobileCLIP mit Transformers.js ──
+echo "Bereite MobileCLIP vor …"
+mkdir -p "$TMP/hf" vendor/transformers vendor/ort
+echo '{"private":true}' > "$TMP/hf/package.json"
+if npm install --no-audit --no-fund --prefix "$TMP/hf" @huggingface/transformers@3 >"$TMP/npm-hf.log" 2>&1; then
+  H="$TMP/hf/node_modules"
+  echo "  ✓ transformers $(node -p "require('$H/@huggingface/transformers/package.json').version")"
+  cp "$H"/@huggingface/transformers/dist/transformers.min.js vendor/transformers/ 2>/dev/null || echo "  ⚠ transformers.min.js fehlt"
+  cp "$H"/onnxruntime-web/dist/ort-wasm-simd-threaded* vendor/ort/ 2>/dev/null || echo "  ⚠ ORT-WASM fehlt"
+  ls "$H/@huggingface/transformers/dist" > "$TMP/hf-dist.txt" 2>/dev/null || true
+  node scripts/prepare-clip.mjs "$TMP/hf" || echo "  ⚠ prepare-clip fehlgeschlagen"
+else
+  echo "  ⚠ transformers nicht installiert:"; tail -n 5 "$TMP/npm-hf.log"
+fi
+
 ls -la models vendor/tfjs vendor/zxing 2>/dev/null || true
 
 # Übersicht, welche Dateien vorhanden sind (zur Kontrolle unter …/build-info.json)
 node -e '
   const fs = require("fs");
   const size = (p) => { try { return fs.statSync(p).size; } catch { return 0; } };
-  const files = ["models/aiy_food_V1.tflite", "models/aiy_food_V1_labels.json", "vendor/tfjs/tf-core.min.js",
+  const files = ["models/aiy_food_V1.tflite", "models/aiy_food_V1_labels.json", "models/clip/text-embeds.bin", "models/clip/vocab.json",
+    "models/clip/Xenova/mobileclip_s0/onnx/vision_model_quantized.onnx", "vendor/transformers/transformers.min.js", "vendor/tfjs/tf-core.min.js",
     "vendor/tfjs/tf-backend-cpu.min.js", "vendor/tfjs/tf-tflite.min.js", "vendor/zxing/zxing.min.js"];
   const wasm = fs.existsSync("vendor/tfjs") ? fs.readdirSync("vendor/tfjs").filter((f) => f.startsWith("tflite_web_api")) : [];
+  const ort = fs.existsSync("vendor/ort") ? fs.readdirSync("vendor/ort") : [];
+  let hfDist = [];
+  try { hfDist = fs.readFileSync(process.argv[3], "utf8").split("\n").filter(Boolean); } catch {}
   const ver = (p) => { try { return require(process.argv[1] + "/" + p + "/package.json").version; } catch { return null; } };
   const versions = Object.fromEntries(["@tensorflow/tfjs-core", "@tensorflow/tfjs-backend-cpu", "@tensorflow/tfjs-tflite", "@zxing/library"].map((p) => [p, ver(p)]));
   let tfliteDist = [];
   try { tfliteDist = fs.readFileSync(process.argv[2], "utf8").split("\n").filter(Boolean); } catch {}
-  fs.writeFileSync("build-info.json", JSON.stringify({ builtAt: new Date().toISOString(), files: Object.fromEntries(files.map((f) => [f, size(f)])), wasm, versions, tfliteDist }, null, 2));
-' "$TMP/npm/node_modules" "$TMP/tflite-dist.txt"
+  fs.writeFileSync("build-info.json", JSON.stringify({ ...(fs.existsSync("build-info.json") ? JSON.parse(fs.readFileSync("build-info.json", "utf8")) : {}), builtAt: new Date().toISOString(), files: Object.fromEntries(files.map((f) => [f, size(f)])), wasm, ort, hfDist, versions, tfliteDist }, null, 2));
+'  "$TMP/npm/node_modules" "$TMP/tflite-dist.txt" "$TMP/hf-dist.txt"
 node scripts/check-labels.mjs || true
 cat build-info.json
 exit 0

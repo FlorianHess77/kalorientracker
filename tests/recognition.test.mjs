@@ -197,3 +197,38 @@ describe('Schätzwerte nach Gerichtstyp', () => {
     assert.ok(estimateDish('irgendwas').estimated);
   });
 });
+
+describe('Zweite Erkennung (MobileCLIP)', () => {
+  test('Wortschatz verweist nur auf vorhandene Lebensmittel', async () => {
+    const { CLIP_VOCAB } = await import('../js/data/clip-vocab.js');
+    const { FOOD_BY_ID } = await import('../js/data/food-index.js');
+    for (const [term, ref] of CLIP_VOCAB) if (ref) assert.ok(FOOD_BY_ID.has(ref), `${term} → ${ref}`);
+    assert.ok(CLIP_VOCAB.some(([, r]) => r === null), 'Begriffe für "kein Essen" vorhanden');
+    for (const f of FOOD_BY_ID.values()) assert.ok(f.portions.small_g < f.portions.medium_g && f.portions.medium_g < f.portions.large_g, f.id);
+  });
+
+  test('Steak, Pommes und Bohnen werden als getrennte Komponenten erkannt', async () => {
+    const { clipCandidates, softmaxScaled } = await import('../js/recognition/combine.js');
+    const items = [
+      { term: 'a grilled beef steak', ref: 'generic:Rindersteak, gebraten' },
+      { term: 'french fries', ref: 'generic:Pommes frites' },
+      { term: 'crinkle cut fries', ref: 'generic:Pommes frites' },
+      { term: 'green beans', ref: 'generic:Fisolen, gekocht' },
+      { term: 'meatloaf', ref: 'dish:Meatloaf' },
+      { term: 'an empty plate', ref: null },
+    ];
+    const sets = [
+      [0.30, 0.15, 0.10, 0.15, 0.25, 0.05], // ganzes Foto
+      [0.70, 0.05, 0.02, 0.03, 0.18, 0.02], // Ausschnitt Steak
+      [0.05, 0.45, 0.40, 0.05, 0.03, 0.02], // Ausschnitt Pommes (zwei Begriffe zusammen)
+      [0.03, 0.05, 0.02, 0.85, 0.03, 0.02], // Ausschnitt Bohnen
+    ];
+    const r = clipCandidates(sets, items);
+    assert.deepEqual(r.components.map((c) => c.ref), ['generic:Pommes frites', 'generic:Fisolen, gekocht', 'generic:Rindersteak, gebraten']);
+    assert.ok(Math.abs(r.nonFood - 0.05) < 1e-9);
+    assert.equal(r.candidates[0].ref, 'generic:Pommes frites');
+
+    const p = softmaxScaled(new Float32Array([0.30, 0.25, 0.10]), 100);
+    assert.ok(Math.abs(p.reduce((a, b) => a + b, 0) - 1) < 1e-5 && p[0] > 0.99);
+  });
+});
