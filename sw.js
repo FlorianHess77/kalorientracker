@@ -4,7 +4,7 @@
  * - Open Food Facts: immer live (keine Zwischenspeicherung hier)
  */
 
-const VERSION = '1.2.1';
+const VERSION = '1.3.0';
 const SHELL_CACHE = `kt-shell-${VERSION}`;
 const DATA_CACHE = 'kt-data-v1';
 
@@ -31,6 +31,7 @@ const SHELL_FILES = [
   'js/lib/image.js',
   'js/lib/nutrition.js',
   'js/lib/stats.js',
+  'js/data/dish-estimates.js',
   'js/data/food-classes.js',
   'js/data/generic-foods.js',
   'js/recognition/memory.js',

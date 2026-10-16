@@ -6,12 +6,14 @@ import { addDays, todayISO } from '../lib/dates.js';
 import { nutrientsForGrams } from '../lib/nutrition.js';
 import { filterFoods, normalize, recentItems } from '../lib/stats.js';
 import { GENERIC_FOODS } from '../data/generic-foods.js';
-import { DISH_FOODS } from '../data/food-classes.js';
+import { DISH_FOODS, FOOD_CLASSES } from '../data/food-classes.js';
+import { estimateDish } from '../data/dish-estimates.js';
+import { isUsableLabel } from '../recognition/postprocess.js';
 import { OffError, searchProducts } from '../off.js';
 import { ensureDraft, setPendingFood } from '../draft.js';
 import { button, clear, fmt, h, header, icon, notice, toast } from '../ui.js';
 
-const SOURCE_LABEL = { generic: 'Grundnahrungsmittel', custom: 'Eigenes', off: 'Open Food Facts', recent: 'Zuletzt' };
+const SOURCE_LABEL = { generic: 'Grundnahrungsmittel', custom: 'Eigenes', off: 'Open Food Facts', recent: 'Zuletzt', estimate: 'Schätzwert', dish: 'Gericht' };
 
 export async function render(view, params) {
   const replace = params.replace || '';
@@ -27,6 +29,21 @@ export async function render(view, params) {
     return true;
   });
   const recent = recentItems(recentMeals, 10);
+
+  // Alle weiteren Gerichte des Foto-Modells mit Schätzwerten (Labelliste wird lokal geladen)
+  try {
+    const res = await fetch(new URL('../../models/aiy_food_V1_labels.json', import.meta.url));
+    if (res.ok) {
+      for (const label of await res.json()) {
+        if (!isUsableLabel(label) || FOOD_CLASSES.has(label)) continue;
+        const est = estimateDish(label);
+        const key = normalize(label);
+        if (seenNames.has(key)) continue;
+        seenNames.add(key);
+        pool.push({ id: `estimate:${label}`, source: 'estimate', name: label, brand: null, barcode: null, per100g: est.per100g, servingG: est.portions.medium_g, portions: est.portions });
+      }
+    }
+  } catch { /* ohne Labelliste nur die genauen Daten */ }
 
   let query = params.q || '';
   let remote = [];

@@ -12,6 +12,8 @@ const SOURCE_TEXT = {
   custom: 'Eigenes Lebensmittel',
   off: 'Open Food Facts',
   recent: 'Zuletzt gegessen',
+  estimate: 'Grober Schätzwert nach Gerichtstyp',
+  dish: 'Gericht – Richtwerte für eine typische Zubereitung',
 };
 
 export async function render(view, params) {

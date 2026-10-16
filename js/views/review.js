@@ -160,6 +160,11 @@ export async function render(view) {
         h('span', { class: 'item-name' }, item.name,
           item.confidence !== null && item.confidence !== undefined ? h('span', { class: 'badge' }, `${Math.round(item.confidence * 100)} % sicher`) : null),
         iconButton('trash', () => { d.items = d.items.filter((x) => x !== item); draw(); }, `${item.name} entfernen`)),
+      item.estimated
+        ? h('div', { class: 'estimate-hint' },
+          h('span', { class: 'muted small' }, `Grober Schätzwert (${item.estimateType ?? 'Gericht'}) – für genaue Werte suchen.`),
+          button('Genauer', () => navigate(`search?q=${encodeURIComponent(item.name)}&replace=${item.id}`), { variant: 'ghost', small: true, iconName: 'search' }))
+        : null,
       item.needsNutrition
         ? h('div', null,
           notice(`Für „${item.name}“ sind noch keine Nährwerte hinterlegt.`, 'info'),

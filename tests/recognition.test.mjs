@@ -52,9 +52,11 @@ describe('Erkennung: Auswertung', () => {
     assert.equal(r.alternatives[0].name, 'Gulasch');
   });
 
-  test('Ergebnis ohne Nährwerte und ohne Essen', () => {
+  test('Ergebnis ohne genaue Nährwerte (Schätzwert) und ohne Essen', () => {
     const unknown = buildOnDeviceResult({ candidates: [{ label: 'Pizza bagel', name: 'Pizza bagel', confidence: 0.9 }], classes: FOOD_CLASSES, modelVersion: 't', durationMs: 1 });
-    assert.equal(unknown.items[0].per100g, null);
+    assert.equal(unknown.items[0].estimated, true);
+    assert.equal(unknown.items[0].estimateType, 'Pizza');
+    assert.ok(unknown.items[0].per100g.kcal > 0);
     assert.deepEqual(validateResult(unknown), []);
     const none = buildOnDeviceResult({ candidates: [{ label: 'Goulash', name: 'Goulash', confidence: 0.02 }], classes: FOOD_CLASSES, modelVersion: 't', durationMs: 1 });
     assert.equal(none.status, 'no_food');
@@ -177,5 +179,21 @@ describe('Foto-Gedächtnis', () => {
     assert.equal(m[0].id, 'b', 'neuester Eintrag zuerst');
     assert.deepEqual(findMatches(pizza, entries.slice(0, 2)), []);
     assert.deepEqual(memoryItems([item('A', 100), { name: 'ohne', grams: 10, per100g: null }]).map((i) => i.name), ['A']);
+  });
+});
+
+describe('Schätzwerte nach Gerichtstyp', () => {
+  test('Typ wird am Namen erkannt', async () => {
+    const { estimateDish } = await import('../js/data/dish-estimates.js');
+    const t = (l) => estimateDish(l).type;
+    assert.equal(t('Bún bò Huế'), 'Nudelsuppe');
+    assert.equal(t('Bánh mì'), 'Sandwich / Burger');
+    assert.equal(t('Pierogi'), 'Teigtaschen');
+    assert.equal(t('Steak tartare'), 'Fleischgericht');
+    assert.equal(t('Zwetschgenkuchen'), 'Kuchen / Süßspeise');
+    assert.equal(t('Shark fin soup'), 'Suppe');
+    assert.equal(t('Kimchi fried rice'), 'Reisgericht');
+    assert.equal(t('Kalamay'), 'Gericht');
+    assert.ok(estimateDish('irgendwas').estimated);
   });
 });

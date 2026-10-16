@@ -92,7 +92,7 @@ export function filterFoods(foods, query, limit = 30) {
     const hay = normalize(`${f.name} ${f.brand ?? ''} ${f.aliases ?? ''}`);
     if (!words.every((w) => hay.includes(w))) continue;
     const name = normalize(f.name);
-    const score = (name.startsWith(words[0]) ? 0 : 1) + (f.source === 'generic' ? 0 : 0.5) + name.length / 1000;
+    const score = (name.startsWith(words[0]) ? 0 : 1) + (f.source === 'generic' || f.source === 'dish' ? 0 : f.source === 'estimate' ? 1 : 0.5) + name.length / 1000;
     scored.push({ f, score });
   }
   return scored.sort((a, b) => a.score - b.score).slice(0, limit).map((s) => s.f);

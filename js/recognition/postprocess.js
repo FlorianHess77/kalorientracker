@@ -12,6 +12,8 @@
  * }
  */
 
+import { estimateDish } from '../data/dish-estimates.js';
+
 export const THRESHOLDS = Object.freeze({
   // Das Modell wählt aus ca. 2000 Gerichten – schon 5 % sind deutlich über dem Zufall.
   minFood: 0.03, // darunter: "kein Essen erkannt"
@@ -118,12 +120,16 @@ export function buildOnDeviceResult({ candidates, components = [], classes, mode
 
 export function itemFromCandidate(candidate, classes) {
   const cls = classes.get(candidate.label);
+  // Ohne hinterlegte Nährwerte: grober Schätzwert nach Gerichtstyp (deutlich gekennzeichnet)
+  const est = cls ? null : estimateDish(candidate.label);
   return {
     ...candidate,
     name: cls?.nameDe ?? candidate.name,
     estimatedGrams: null,
-    per100g: cls?.per100g ?? null,
-    portions: cls?.portions ?? null,
+    per100g: cls?.per100g ?? est.per100g,
+    portions: cls?.portions ?? est.portions,
+    estimated: Boolean(est),
+    estimateType: est?.type ?? null,
   };
 }
 

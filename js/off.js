@@ -11,6 +11,9 @@ const FIELDS = 'code,product_name,product_name_de,generic_name_de,brands,nutrime
 
 export class OffError extends Error {}
 
+/** Letzte technische Fehler der Online-Suche (für die Diagnose) */
+export let lastSearchProblems = [];
+
 const recentSearches = [];
 function checkSearchLimit() {
   const now = Date.now();
@@ -27,13 +30,15 @@ async function getJSON(url, signal) {
     res = await fetch(url, { signal, headers: { Accept: 'application/json' } });
   } catch (e) {
     if (e.name === 'AbortError') throw e;
-    throw new OffError(navigator.onLine === false
+    const err = new OffError(navigator.onLine === false
       ? 'Keine Internetverbindung.'
       : 'Open Food Facts ist gerade nicht erreichbar. Bitte später nochmal versuchen – lokale Treffer und „Selbst eintragen“ funktionieren immer.');
+    err.cause = new Error(`${new URL(url).hostname}: ${e.message}`);
+    throw err;
   }
   if (res.status === 404) return null;
   if (res.status === 429 || res.status === 503) throw new OffError('Open Food Facts ist gerade überlastet. Bitte gleich nochmal versuchen.');
-  if (!res.ok) throw new OffError(`Open Food Facts antwortet mit Fehler ${res.status}.`);
+  if (!res.ok) throw new OffError(`Open Food Facts antwortet mit Fehler ${res.status} (${new URL(url).hostname}).`);
   return res.json();
 }
 
@@ -104,16 +109,19 @@ export async function searchProducts(query, { signal } = {}) {
       return data?.products ?? [];
     },
   ];
-  let lastError = null;
-  for (const attempt of attempts) {
+  const problems = [];
+  for (const [i, attempt] of attempts.entries()) {
     try {
       const foods = (await attempt()).map((p) => productToFood(p)).filter((f) => f.per100g && f.barcode);
       if (foods.length) return foods;
     } catch (e) {
       if (e.name === 'AbortError') throw e;
-      lastError = e;
+      problems.push(`${i === 0 ? 'Suchdienst' : 'Alte Suche'}: ${e.cause?.message ?? e.message}`);
     }
   }
-  if (lastError) throw lastError;
+  if (problems.length === attempts.length) {
+    lastSearchProblems = problems;
+    throw new OffError('Die Online-Suche von Open Food Facts antwortet gerade nicht. Lokale Treffer, Barcode-Scanner und „Selbst eintragen“ funktionieren trotzdem.');
+  }
   return [];
 }

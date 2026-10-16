@@ -146,7 +146,7 @@ export async function render(view, params) {
 
 function toDraftItem(it) {
   const grams = it.estimatedGrams ?? it.portions?.medium_g ?? 100;
-  const base = { id: db.uid(), name: it.name, label: it.label, foodRef: it.label ? `model:${it.label}` : null, confidence: it.confidence, portions: it.portions, per100g: it.per100g, grams };
+  const base = { id: db.uid(), name: it.name, label: it.label, foodRef: it.label ? `model:${it.label}` : null, confidence: it.confidence, portions: it.portions, per100g: it.per100g, grams, estimated: Boolean(it.estimated), estimateType: it.estimateType ?? null };
   if (!it.per100g) return { ...base, needsNutrition: true, kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
   return { ...base, ...nutrientsForGrams(it.per100g, grams) };
 }
