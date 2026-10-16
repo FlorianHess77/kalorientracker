@@ -122,6 +122,14 @@ describe('Projektdateien', () => {
     for (const f of listed) assert.ok(statSync(join(root, f)).isFile(), `existiert nicht: ${f}`);
   });
 
+  test('Alle JavaScript-Dateien sind syntaktisch korrekt', async () => {
+    const { spawnSync } = await import('node:child_process');
+    for (const f of walk(join(root, 'js')).filter((p) => p.endsWith('.js'))) {
+      const r = spawnSync(process.execPath, ['--check', f], { encoding: 'utf8' });
+      assert.equal(r.status, 0, `${relative(root, f)}: ${r.stderr}`);
+    }
+  });
+
   test('Alle Views exportieren render()', async () => {
     const main = readFileSync(join(root, 'js/main.js'), 'utf8');
     const routes = [...main.matchAll(/import\('\.\/views\/(\w+)\.js'\)/g)].map((m) => m[1]);

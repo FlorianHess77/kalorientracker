@@ -6,6 +6,7 @@ import { ACTIVITY_OPTIONS, GOAL_OPTIONS, MANUAL_ISSUE_TEXT, MIN_KCAL, checkManua
 import { parseDecimal, todayISO } from '../lib/dates.js';
 import { buildICS, mealsToCSV, validateBackup, waterToCSV, weightsToCSV } from '../lib/export.js';
 import { button, clear, confirmDialog, field, fmt, h, icon, isNativeApp, notice, numberInput, pickFile, saveFile, toast } from '../ui.js';
+import { installApp, isStandalone } from '../install.js';
 
 export async function render(view) {
   const today = todayISO();
@@ -122,7 +123,7 @@ export async function render(view) {
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
   const native = isNativeApp();
   const isAndroid = /Android/i.test(navigator.userAgent);
-  const standalone = native || window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone;
+  const standalone = isStandalone();
 
   view.append(
     section('Ziele', 'scale', goalBox),
@@ -144,15 +145,15 @@ export async function render(view) {
       button('Zum Kalender hinzufügen', downloadReminders, { variant: 'secondary', iconName: 'download' })),
     !standalone
       ? section('Als App installieren', 'download',
-        isAndroid
-          ? h('div', { class: 'stack' },
-            h('p', { class: 'muted small' }, 'Lade die Android-App herunter und öffne die Datei. Beim ersten Mal fragt Android, ob du Apps aus dieser Quelle erlauben willst. Deine bisherigen Einträge nimmst du per „Backup speichern“ und in der App „Backup einspielen“ mit.'),
-            h('a', { class: 'btn btn-primary', href: 'https://github.com/FlorianHess77/kalorientracker/releases/latest/download/kalorientracker.apk' }, icon('download', 20), h('span', null, 'Android-App herunterladen')))
-          : app.installPrompt
-            ? button('Auf dem Startbildschirm installieren', async () => { app.installPrompt.prompt(); await app.installPrompt.userChoice; app.installPrompt = null; }, { iconName: 'download' })
-            : h('p', { class: 'muted small' }, isIOS
-              ? 'In Safari unten auf „Teilen“ tippen und „Zum Home-Bildschirm“ wählen. Dann startet die App wie eine normale App – und iOS löscht die Daten nicht nach längerer Nichtnutzung.'
-              : 'Im Browser-Menü „App installieren“ bzw. „Zum Startbildschirm hinzufügen“ wählen.'))
+        h('div', { class: 'stack' },
+          h('p', { class: 'muted small' }, 'Installiert den Kalorientracker wie eine normale App auf deinem Startbildschirm – ohne Browserleiste und auch offline.'),
+          button('App installieren', installApp, { iconName: 'download' }),
+          isAndroid
+            ? h('details', null,
+              h('summary', null, 'Alternative: Android-App als Datei (APK)'),
+              h('p', { class: 'muted small' }, 'Falls die Installation über Chrome nicht klappt: APK herunterladen und öffnen. Android fragt dann, ob du Apps aus dieser Quelle erlauben willst. Daten nimmst du per Backup mit.'),
+              h('a', { class: 'btn btn-secondary btn-small', href: 'https://github.com/FlorianHess77/kalorientracker/releases/latest/download/kalorientracker.apk' }, icon('download', 18), h('span', null, 'APK herunterladen')))
+            : null))
       : null,
     section('Daten', 'download',
       !persisted ? notice('Der Browser darf die Daten bei Speichermangel löschen. Installiere die App auf dem Startbildschirm und mache ab und zu ein Backup.', 'info') : null,

@@ -4,7 +4,7 @@
  * - Open Food Facts: immer live (keine Zwischenspeicherung hier)
  */
 
-const VERSION = '1.2.0';
+const VERSION = '1.2.1';
 const SHELL_CACHE = `kt-shell-${VERSION}`;
 const DATA_CACHE = 'kt-data-v1';
 
@@ -21,6 +21,7 @@ const SHELL_FILES = [
   'js/main.js',
   'js/db.js',
   'js/draft.js',
+  'js/install.js',
   'js/ui.js',
   'js/off.js',
   'js/lib/calc.js',

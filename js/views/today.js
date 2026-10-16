@@ -7,6 +7,7 @@ import { blobUrl } from '../lib/image.js';
 import { dayTotals, mealTotals } from '../lib/nutrition.js';
 import { computeStreak } from '../lib/stats.js';
 import { bar, fmt, h, icon, iconButton, ring } from '../ui.js';
+import { installBanner } from '../install.js';
 
 export async function render(view, params) {
   const today = todayISO();
@@ -38,6 +39,8 @@ export async function render(view, params) {
     ),
   );
   if (date !== today) view.append(h('button', { type: 'button', class: 'link-btn center', onclick: () => goTo(today) }, 'Zurück zu heute'));
+  const banner = installBanner();
+  if (banner) view.append(banner);
 
   // ───────────── Kalorien-Ring ─────────────
   const over = remaining < 0;
