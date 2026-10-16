@@ -9,6 +9,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  issues: write
 
 concurrency:
   group: pages
@@ -29,6 +30,16 @@ jobs:
 
       - name: Foto-Modell und Bibliotheken herunterladen
         run: bash scripts/fetch-assets.sh
+
+      - name: Build-Übersicht als Issue ablegen
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          { echo "Automatisch erzeugt von Build ${{ github.run_number }} (${{ github.sha }})."; echo; echo '```json'; cat build-info.json; echo '```'; } > info.md
+          gh label create build-info --color 0E8A16 --description "Automatische Build-Übersicht" 2>/dev/null || true
+          N=$(gh issue list --label build-info --state all --json number --jq '.[0].number')
+          if [ -n "$N" ]; then gh issue edit "$N" --body-file info.md; else gh issue create --title "Build-Info (automatisch)" --label build-info --body-file info.md; fi
 
       - uses: actions/configure-pages@v5
 
