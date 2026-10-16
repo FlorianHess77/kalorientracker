@@ -6,7 +6,7 @@ import { releaseBlobUrls } from './lib/image.js';
 import { clearDraft, setCaptureContext } from './draft.js';
 import { clear, h, icon, notice, toast } from './ui.js';
 
-export const APP_VERSION = '1.0.2';
+export const APP_VERSION = '1.0.3';
 
 export const app = {
   profile: null,
@@ -151,7 +151,17 @@ async function boot() {
   await render();
 
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-    navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('Service Worker nicht registriert:', e));
+    // Neue Version sofort übernehmen: Wenn ein neuer Service Worker die Kontrolle übernimmt, einmal neu laden
+    const hadController = Boolean(navigator.serviceWorker.controller);
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || reloading) return;
+      reloading = true;
+      location.reload();
+    });
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+      .then((reg) => reg.update())
+      .catch((e) => console.warn('Service Worker nicht registriert:', e));
   }
 }
 

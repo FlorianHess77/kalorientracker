@@ -159,7 +159,24 @@ export async function render(view) {
         h('li', null, 'Die Foto-Erkennung läuft lokal (Google AIY Food Classifier mit TensorFlow Lite). Fotos werden nicht hochgeladen.'),
         h('li', null, 'Bei Barcode und Produktsuche wird nur der Barcode bzw. Suchbegriff an Open Food Facts gesendet. Produktdaten: © Open Food Facts, Lizenz ODbL.'),
         h('li', null, 'Kalorien- und Nährwertangaben sind Schätzungen. Die App ersetzt keine medizinische oder ernährungstherapeutische Beratung.')),
-      h('p', { class: 'muted small center' }, `Version ${APP_VERSION}`)),
+      h('p', { class: 'muted small center' }, `Version ${APP_VERSION}`),
+      h('details', { class: 'diagnose' },
+        h('summary', null, 'Technische Diagnose'),
+        h('p', { class: 'muted small' }, 'Falls die Foto-Erkennung nicht klappt: einmal ein Foto versuchen, dann hier „Anzeigen“ tippen und den Text kopieren.'),
+        h('div', { class: 'row' },
+          button('Anzeigen', async (e) => {
+            const { getDiagnostics, warmUp } = await import('../recognition/recognizer.js');
+            await warmUp().catch(() => {});
+            const text = JSON.stringify({ version: APP_VERSION, ...(await getDiagnostics()) }, null, 2);
+            const pre = e.target.closest('details').querySelector('pre');
+            pre.textContent = text;
+            pre.hidden = false;
+          }, { variant: 'secondary', small: true }),
+          button('Kopieren', async (e) => {
+            const pre = e.target.closest('details').querySelector('pre');
+            try { await navigator.clipboard.writeText(pre.textContent); toast('Kopiert'); } catch { toast('Bitte den Text markieren und kopieren.'); }
+          }, { variant: 'ghost', small: true })),
+        h('pre', { class: 'diag-text', hidden: true }))),
   );
   showGoal();
 }

@@ -1,10 +1,10 @@
 /* Service Worker: macht die App offline-fähig.
- * - App-Dateien: sofort aus dem Cache, im Hintergrund aktualisiert
+ * - App-Dateien: immer zuerst aus dem Netz (damit Updates sofort ankommen), offline aus dem Cache
  * - Modell, Bibliotheken: einmal laden, dann dauerhaft aus dem Cache
  * - Open Food Facts: immer live (keine Zwischenspeicherung hier)
  */
 
-const VERSION = '1.0.2';
+const VERSION = '1.0.3';
 const SHELL_CACHE = `kt-shell-${VERSION}`;
 const DATA_CACHE = 'kt-data-v1';
 
@@ -56,7 +56,12 @@ const LONG_LIVED = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(SHELL_CACHE).then((c) => c.addAll(SHELL_FILES)).then(() => self.skipWaiting()));
+  // cache: 'reload' umgeht den HTTP-Cache des Browsers, sonst landen alte Dateien im neuen Cache
+  event.waitUntil(
+    caches.open(SHELL_CACHE)
+      .then((c) => c.addAll(SHELL_FILES.map((f) => new Request(f, { cache: 'reload' }))))
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener('activate', (event) => {
@@ -81,10 +86,10 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   if (request.mode === 'navigate') {
-    event.respondWith(fetch(request).catch(() => caches.match('index.html')));
+    event.respondWith(fetch(request, { cache: 'no-cache' }).catch(() => caches.match('index.html')));
     return;
   }
-  event.respondWith(staleWhileRevalidate(request));
+  event.respondWith(networkFirst(request));
 });
 
 async function cacheFirst(request) {
@@ -96,11 +101,13 @@ async function cacheFirst(request) {
   return res;
 }
 
-async function staleWhileRevalidate(request) {
+async function networkFirst(request) {
   const cache = await caches.open(SHELL_CACHE);
-  const hit = await cache.match(request, { ignoreSearch: true });
-  const network = fetch(request)
-    .then((res) => { if (res.ok) cache.put(request, res.clone()); return res; })
-    .catch(() => hit ?? Response.error());
-  return hit ?? network;
+  try {
+    const res = await fetch(request, { cache: 'no-cache' });
+    if (res.ok) cache.put(request, res.clone());
+    return res;
+  } catch {
+    return (await cache.match(request, { ignoreSearch: true })) ?? Response.error();
+  }
 }

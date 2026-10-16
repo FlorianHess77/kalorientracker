@@ -45,6 +45,25 @@ let status = 'idle'; // idle | loading | ready | failed
 
 export const recognizerStatus = () => status;
 
+/** Technische Angaben für die Fehlersuche (Einstellungen → Diagnose) */
+const diag = { lastError: null, lastStage: null, lastRun: null };
+export async function getDiagnostics() {
+  const out = { status, ...diag, userAgent: navigator.userAgent, wasmPath: diag.wasmPath ?? null };
+  try {
+    const engine = enginePromise ? await enginePromise.catch(() => null) : null;
+    if (engine) {
+      out.input = engine.model.inputs?.map((t) => ({ name: t.name, shape: t.shape, dtype: t.dtype }));
+      out.output = engine.model.outputs?.map((t) => ({ name: t.name, shape: t.shape, dtype: t.dtype }));
+      out.labels = engine.labels.length;
+      out.tfVersion = globalThis.tf?.version_core ?? globalThis.tf?.version?.['tfjs-core'] ?? null;
+      out.backend = globalThis.tf?.getBackend?.() ?? null;
+    }
+  } catch (e) {
+    out.diagError = String(e?.message ?? e);
+  }
+  return out;
+}
+
 function loadScript(src) {
   return new Promise((resolve, reject) => {
     const s = document.createElement('script');
@@ -104,6 +123,7 @@ async function createEngine() {
   status = 'loading';
   try {
     const wasmPath = await loadLibs();
+    diag.wasmPath = wasmPath;
     const { tf, tflite } = globalThis;
     tflite.setWasmPath(wasmPath);
 
@@ -120,6 +140,8 @@ async function createEngine() {
     status = 'failed';
     enginePromise = null;
     console.error('Foto-Erkennung nicht verfügbar:', e);
+    diag.lastError = String(e?.message ?? e);
+    diag.lastStage = 'Laden';
     throw new RecognitionUnavailable(
       'Die Foto-Erkennung konnte nicht geladen werden. Prüfe deine Internetverbindung (beim ersten Mal nötig) oder trag das Essen über Suche oder Barcode ein.',
     );
@@ -178,8 +200,11 @@ export async function recognizeFood(file) {
     });
     const errors = validateResult(result);
     if (errors.length) throw new Error(`Ungültiges Ergebnis: ${errors.join(', ')}`);
+    diag.lastRun = { at: new Date().toISOString(), outDtype: outTensor.dtype, outLength: raw.length, top: candidates.slice(0, 3), ms: result.durationMs };
     return result;
   } catch (e) {
+    diag.lastError = String(e?.stack ?? e?.message ?? e).slice(0, 800);
+    diag.lastStage = stage;
     console.error(`Foto-Erkennung, Schritt „${stage}“:`, e, { inputDtype, width, height, labels: labels?.length });
     const err = new Error(`${stage}: ${e?.message ?? e}`);
     err.stage = stage;

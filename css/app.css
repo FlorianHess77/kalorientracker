@@ -433,3 +433,5 @@ details summary { cursor: pointer; color: var(--accent-strong); font-weight: 600
 @media (max-width: 360px) {
   .tile-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+.diag-text { white-space: pre-wrap; word-break: break-all; font-size: .72rem; background: var(--bg); padding: 10px; border-radius: 10px; max-height: 320px; overflow: auto; user-select: text; }
