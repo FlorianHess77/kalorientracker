@@ -62,4 +62,15 @@ else
 fi
 
 ls -la models vendor/tfjs vendor/zxing 2>/dev/null || true
+
+# Übersicht, welche Dateien vorhanden sind (zur Kontrolle unter …/build-info.json)
+node -e '
+  const fs = require("fs");
+  const size = (p) => { try { return fs.statSync(p).size; } catch { return 0; } };
+  const files = ["models/aiy_food_V1.tflite", "models/aiy_food_V1_labels.json", "vendor/tfjs/tf-core.min.js",
+    "vendor/tfjs/tf-backend-cpu.min.js", "vendor/tfjs/tf-tflite.min.js", "vendor/zxing/zxing.min.js"];
+  const wasm = fs.existsSync("vendor/tfjs") ? fs.readdirSync("vendor/tfjs").filter((f) => f.startsWith("tflite_web_api")) : [];
+  fs.writeFileSync("build-info.json", JSON.stringify({ builtAt: new Date().toISOString(), files: Object.fromEntries(files.map((f) => [f, size(f)])), wasm }, null, 2));
+'
+cat build-info.json
 exit 0

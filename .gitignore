@@ -4,3 +4,4 @@ models/*.json
 vendor/
 node_modules/
 .DS_Store
+build-info.json
