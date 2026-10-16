@@ -27,7 +27,9 @@ async function getJSON(url, signal) {
     res = await fetch(url, { signal, headers: { Accept: 'application/json' } });
   } catch (e) {
     if (e.name === 'AbortError') throw e;
-    throw new OffError('Keine Verbindung zu Open Food Facts. Bist du online?');
+    throw new OffError(navigator.onLine === false
+      ? 'Keine Internetverbindung.'
+      : 'Open Food Facts ist gerade nicht erreichbar. Bitte später nochmal versuchen – lokale Treffer und „Selbst eintragen“ funktionieren immer.');
   }
   if (res.status === 404) return null;
   if (res.status === 429 || res.status === 503) throw new OffError('Open Food Facts ist gerade überlastet. Bitte gleich nochmal versuchen.');
@@ -36,6 +38,15 @@ async function getJSON(url, signal) {
 }
 
 const num = (v) => (v === undefined || v === null || v === '' ? NaN : Number(v));
+
+/** Text oder { de: …, en: …, main: … } → Text */
+const text = (v) => {
+  if (!v) return '';
+  if (typeof v === 'string') return v;
+  if (Array.isArray(v)) return v.map(text).filter(Boolean).join(', ');
+  if (typeof v === 'object') return v.de ?? v.main ?? v.en ?? Object.values(v)[0] ?? '';
+  return String(v);
+};
 
 /** Produkt aus Open Food Facts → App-Format. Gibt null zurück, wenn Nährwerte fehlen. */
 export function productToFood(p, fallbackCode) {
@@ -54,8 +65,8 @@ export function productToFood(p, fallbackCode) {
     id: `off:${code}`,
     source: 'off',
     barcode: code,
-    name: (p.product_name_de || p.product_name || p.generic_name_de || '').trim() || 'Unbenanntes Produkt',
-    brand: (p.brands || '').split(',')[0].trim() || null,
+    name: (text(p.product_name_de) || text(p.product_name) || text(p.generic_name_de)).trim() || 'Unbenanntes Produkt',
+    brand: text(p.brands).split(',')[0].trim() || null,
     per100g: isPlausiblePer100g(per100g) ? per100g : null,
     servingG: serving > 0 && serving < 2000 ? Math.round(serving) : null,
   };
@@ -69,13 +80,40 @@ export async function fetchProductByBarcode(code, { signal } = {}) {
   return productToFood(data.product, clean);
 }
 
+/**
+ * Volltextsuche. Zuerst über den neuen Suchdienst (search.openfoodfacts.org), bei Fehlern
+ * oder ohne brauchbare Treffer über die ältere Suche.
+ */
 export async function searchProducts(query, { signal } = {}) {
   const q = query.trim();
   if (q.length < 2) return [];
   checkSearchLimit();
-  const url =
-    `${BASE}/cgi/search.pl?action=process&json=1&search_simple=1&page_size=24` +
-    `&search_terms=${encodeURIComponent(q)}&fields=${FIELDS}`;
-  const data = await getJSON(url, signal);
-  return (data?.products || []).map((p) => productToFood(p)).filter((f) => f.per100g && f.barcode);
+  const attempts = [
+    async () => {
+      const data = await getJSON(
+        `https://search.openfoodfacts.org/search?q=${encodeURIComponent(q)}&page_size=30&langs=de,en&fields=${FIELDS}`,
+        signal,
+      );
+      return data?.hits ?? [];
+    },
+    async () => {
+      const data = await getJSON(
+        `${BASE}/cgi/search.pl?action=process&json=1&search_simple=1&page_size=24&search_terms=${encodeURIComponent(q)}&fields=${FIELDS}`,
+        signal,
+      );
+      return data?.products ?? [];
+    },
+  ];
+  let lastError = null;
+  for (const attempt of attempts) {
+    try {
+      const foods = (await attempt()).map((p) => productToFood(p)).filter((f) => f.per100g && f.barcode);
+      if (foods.length) return foods;
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;
+      lastError = e;
+    }
+  }
+  if (lastError) throw lastError;
+  return [];
 }

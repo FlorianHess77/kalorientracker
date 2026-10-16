@@ -13,7 +13,7 @@ import { buildICS, mealsToCSV, toCSV, validateBackup } from '../js/lib/export.js
 import { niceTicks, barChart, lineChart } from '../js/lib/charts.js';
 import { productToFood } from '../js/off.js';
 import { GENERIC_FOODS } from '../js/data/generic-foods.js';
-import { FOOD_CLASSES } from '../js/data/food-classes.js';
+import { FOOD_CLASSES, DISH_FOODS } from '../js/data/food-classes.js';
 
 const close = (a, b, eps = 0.01) => assert.ok(Math.abs(a - b) < eps, `${a} ≉ ${b}`);
 
@@ -149,7 +149,10 @@ describe('Nährwerte', () => {
     assert.equal(isPlausiblePer100g(null), false);
   });
   test('Alle mitgelieferten Lebensmittel sind plausibel', () => {
-    for (const f of GENERIC_FOODS) assert.ok(isPlausiblePer100g(f.per100g) && f.servingG > 0, f.name);
+    for (const f of [...GENERIC_FOODS, ...DISH_FOODS]) assert.ok(isPlausiblePer100g(f.per100g) && f.servingG > 0, f.name);
+    const names = GENERIC_FOODS.map((f) => f.name);
+    assert.equal(new Set(names).size, names.length, 'doppelte Namen');
+    assert.ok(GENERIC_FOODS.length >= 140 && FOOD_CLASSES.size >= 150);
     for (const [label, c] of FOOD_CLASSES) {
       assert.ok(isPlausiblePer100g(c.per100g), label);
       assert.ok(c.portions.small_g < c.portions.medium_g && c.portions.medium_g < c.portions.large_g, label);
@@ -201,6 +204,9 @@ describe('Auswertungen', () => {
     assert.ok(filterFoods(GENERIC_FOODS, 'Hühner').some((f) => f.name.startsWith('Hühnerbrust')));
     assert.ok(filterFoods(GENERIC_FOODS, 'huehner').some((f) => f.name.startsWith('Hühnerbrust')));
     assert.deepEqual(filterFoods(GENERIC_FOODS, '   '), []);
+    assert.equal(filterFoods(DISH_FOODS, 'cinnamon roll')[0].name, 'Zimtschnecke');
+    assert.equal(filterFoods(DISH_FOODS, 'zimtschnecke')[0].name, 'Zimtschnecke');
+    assert.equal(filterFoods(GENERIC_FOODS, 'paradeiser')[0].name, 'Tomate');
   });
 });
 

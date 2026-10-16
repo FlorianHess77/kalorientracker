@@ -83,5 +83,6 @@ node -e '
   try { tfliteDist = fs.readFileSync(process.argv[2], "utf8").split("\n").filter(Boolean); } catch {}
   fs.writeFileSync("build-info.json", JSON.stringify({ builtAt: new Date().toISOString(), files: Object.fromEntries(files.map((f) => [f, size(f)])), wasm, versions, tfliteDist }, null, 2));
 ' "$TMP/npm/node_modules" "$TMP/tflite-dist.txt"
+node scripts/check-labels.mjs || true
 cat build-info.json
 exit 0

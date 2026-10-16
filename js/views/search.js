@@ -6,6 +6,7 @@ import { addDays, todayISO } from '../lib/dates.js';
 import { nutrientsForGrams } from '../lib/nutrition.js';
 import { filterFoods, normalize, recentItems } from '../lib/stats.js';
 import { GENERIC_FOODS } from '../data/generic-foods.js';
+import { DISH_FOODS } from '../data/food-classes.js';
 import { OffError, searchProducts } from '../off.js';
 import { ensureDraft, setPendingFood } from '../draft.js';
 import { button, clear, fmt, h, header, icon, notice, toast } from '../ui.js';
@@ -17,7 +18,14 @@ export async function render(view, params) {
   const [ownFoods, favorites, recipes, recentMeals] = await Promise.all([
     db.allFoods(), db.allFavorites(), db.allRecipes(), db.mealsInRange(addDays(todayISO(), -30), addDays(todayISO(), 1)),
   ]);
-  const pool = [...ownFoods.filter((f) => f.per100g), ...GENERIC_FOODS];
+  // Eigene Lebensmittel zuerst; gleiche Namen nur einmal
+  const seenNames = new Set();
+  const pool = [...ownFoods.filter((f) => f.per100g), ...GENERIC_FOODS, ...DISH_FOODS].filter((f) => {
+    const key = normalize(f.name);
+    if (seenNames.has(key)) return false;
+    seenNames.add(key);
+    return true;
+  });
   const recent = recentItems(recentMeals, 10);
 
   let query = params.q || '';

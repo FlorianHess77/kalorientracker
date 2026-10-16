@@ -89,7 +89,7 @@ export function filterFoods(foods, query, limit = 30) {
   if (!words.length) return [];
   const scored = [];
   for (const f of foods) {
-    const hay = normalize(`${f.name} ${f.brand ?? ''}`);
+    const hay = normalize(`${f.name} ${f.brand ?? ''} ${f.aliases ?? ''}`);
     if (!words.every((w) => hay.includes(w))) continue;
     const name = normalize(f.name);
     const score = (name.startsWith(words[0]) ? 0 : 1) + (f.source === 'generic' ? 0 : 0.5) + name.length / 1000;
