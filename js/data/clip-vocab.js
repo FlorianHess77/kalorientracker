@@ -11,8 +11,12 @@
 export const CLIP_VOCAB = [
   // Fleisch & Fisch
   ['a grilled beef steak', 'generic:Rindersteak, gebraten'],
-  ['a ribeye steak', 'dish:Delmonico steak'],
-  ['sliced roast beef', 'dish:Roast beef'],
+  ['a ribeye steak', 'generic:Rindersteak, gebraten'],
+  ['a sirloin steak', 'generic:Rindersteak, gebraten'],
+  ['a medium rare steak', 'generic:Rindersteak, gebraten'],
+  ['a pan fried steak', 'generic:Rindersteak, gebraten'],
+  ['steak with french fries', 'generic:Rindersteak, gebraten'],
+  ['thin slices of roast beef', 'dish:Roast beef'],
   ['a pork chop', 'generic:Schweinskotelett, gebraten'],
   ['roast pork with crackling', 'dish:Schweinshaxe'],
   ['a breaded schnitzel', 'dish:Schnitzel'],
