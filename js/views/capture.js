@@ -68,7 +68,7 @@ export async function render(view, params) {
       if (e instanceof RecognitionUnavailable) {
         toast(e.message, 'error');
       } else {
-        toast('Das Foto konnte nicht ausgewertet werden. Versuch es mit Suche oder Barcode.', 'error');
+        toast(`Das Foto konnte nicht ausgewertet werden. Versuch es mit Suche oder Barcode. (Technisch: ${e.message})`, 'error');
       }
     } finally {
       b.close();

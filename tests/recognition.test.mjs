@@ -103,3 +103,16 @@ describe('Projektdateien', () => {
     }
   });
 });
+
+describe('Erkennung: Rohwerte normalisieren', () => {
+  test('Wahrscheinlichkeiten bleiben, Logits werden zu Softmax', async () => {
+    const { normalizeScores } = await import('../js/recognition/recognizer.js');
+    const p = new Float32Array([0.7, 0.2, 0.1]);
+    assert.equal(normalizeScores(p, 'float32'), p);
+    const s = normalizeScores(new Float32Array([2, 1, -1]), 'float32');
+    assert.ok(Math.abs(s.reduce((a, b) => a + b, 0) - 1) < 1e-5);
+    assert.ok(s[0] > s[1] && s[1] > s[2]);
+    const q = new Float32Array([0.5]);
+    assert.equal(normalizeScores(q, 'int32'), q);
+  });
+});

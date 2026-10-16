@@ -185,7 +185,7 @@ export function toast(message, kind = 'info') {
   el.textContent = message;
   el.className = `toast toast-${kind} show`;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+  toastTimer = setTimeout(() => el.classList.remove('show'), kind === 'error' ? 7000 : 3200);
 }
 
 /** Bestätigungsdialog. Liefert true/false. */

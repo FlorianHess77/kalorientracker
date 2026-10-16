@@ -140,21 +140,35 @@ export async function recognizeFood(file) {
   const started = performance.now();
   const engine = await warmUp();
   const { tf, model, labels, inputDtype, width, height } = engine;
+  let stage = 'Bild lesen';
 
-  const bitmap = await loadBitmap(file);
-  const canvas = squareCanvas(bitmap, width, height);
-  bitmap.close?.();
-
-  const inputTensor = tf.tidy(() => {
-    const pixels = tf.browser.fromPixels(canvas).expandDims(0); // int32, 0..255
-    return inputDtype === 'float32' ? tf.div(tf.cast(pixels, 'float32'), 255) : tf.cast(pixels, 'int32');
-  });
-  let output;
+  const tensors = [];
   try {
-    output = model.predict(inputTensor);
-    const outTensor = Array.isArray(output) ? output[0] : output;
+    const bitmap = await loadBitmap(file);
+    const canvas = squareCanvas(bitmap, width, height);
+    bitmap.close?.();
+
+    // Pixel direkt aus dem Canvas lesen (robuster als tf.browser.fromPixels)
+    stage = 'Bild umwandeln';
+    const { data } = canvas.getContext('2d').getImageData(0, 0, width, height);
+    const isFloat = inputDtype === 'float32';
+    const values = isFloat ? new Float32Array(width * height * 3) : new Int32Array(width * height * 3);
+    for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
+      values[j] = isFloat ? data[i] / 255 : data[i];
+      values[j + 1] = isFloat ? data[i + 1] / 255 : data[i + 1];
+      values[j + 2] = isFloat ? data[i + 2] / 255 : data[i + 2];
+    }
+    const input = tf.tensor(values, [1, height, width, 3], isFloat ? 'float32' : 'int32');
+    tensors.push(input);
+
+    stage = 'Modell ausführen';
+    const output = model.predict(input);
+    const outTensor = pickTensor(output);
+    collectTensors(output, tensors);
+
+    stage = 'Ergebnis lesen';
     const raw = await outTensor.data();
-    const scores = toScores(raw, outTensor.dtype);
+    const scores = normalizeScores(toScores(raw, outTensor.dtype), outTensor.dtype);
     const candidates = topK(scores, labels, THRESHOLDS.topK);
     const result = buildOnDeviceResult({
       candidates,
@@ -165,9 +179,40 @@ export async function recognizeFood(file) {
     const errors = validateResult(result);
     if (errors.length) throw new Error(`Ungültiges Ergebnis: ${errors.join(', ')}`);
     return result;
+  } catch (e) {
+    console.error(`Foto-Erkennung, Schritt „${stage}“:`, e, { inputDtype, width, height, labels: labels?.length });
+    const err = new Error(`${stage}: ${e?.message ?? e}`);
+    err.stage = stage;
+    throw err;
   } finally {
-    inputTensor.dispose();
-    if (Array.isArray(output)) output.forEach((t) => t.dispose());
-    else output?.dispose?.();
+    for (const t of tensors) { try { t.dispose(); } catch { /* egal */ } }
   }
+}
+
+/** predict() kann einen Tensor, eine Liste oder ein Objekt mit Tensoren liefern */
+function pickTensor(output) {
+  if (Array.isArray(output)) return output[0];
+  if (output && typeof output.data === 'function') return output;
+  if (output && typeof output === 'object') return Object.values(output)[0];
+  throw new Error('Unerwartete Modell-Ausgabe');
+}
+
+function collectTensors(output, list) {
+  if (Array.isArray(output)) list.push(...output);
+  else if (output && typeof output.dispose === 'function') list.push(output);
+  else if (output && typeof output === 'object') list.push(...Object.values(output));
+}
+
+/** Falls das Modell Rohwerte (Logits) statt Wahrscheinlichkeiten liefert: Softmax anwenden */
+export function normalizeScores(scores, dtype) {
+  if (dtype !== 'float32') return scores;
+  let min = Infinity;
+  let max = -Infinity;
+  for (const v of scores) { if (v < min) min = v; if (v > max) max = v; }
+  if (min >= 0 && max <= 1) return scores;
+  const out = new Float32Array(scores.length);
+  let total = 0;
+  for (let i = 0; i < scores.length; i++) { out[i] = Math.exp(scores[i] - max); total += out[i]; }
+  for (let i = 0; i < out.length; i++) out[i] /= total;
+  return out;
 }
